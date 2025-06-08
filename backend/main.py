@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.db.base import Base
+from app.models.base import Base
 from app.db.session import engine
-from app.api import epic, hello
+from app.controllers import epic, hello
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -18,6 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routers from controllers
 app.include_router(epic.router)
 app.include_router(hello.router) 
