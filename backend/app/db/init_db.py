@@ -1,8 +1,8 @@
 import logging
 from sqlalchemy.orm import Session
-from .base import Base
+from ..models.base import Base
 from .session import engine
-from .models import Epic  # Import all models here
+from ..models.epic import Epic  # Import all models here
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

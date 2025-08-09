@@ -23,7 +23,18 @@ class Epic(Base):
     core_epic_id = Column(Integer, ForeignKey("epics.id"), nullable=True)
 
     # One to many relationship with sub_epics
-    subs = relationship("Epic", backref="core_epic", remote_side=[id])
+    # core_epic_id가 자신의 id인 epic들을 subs로 가져옴
+    subs = relationship(
+        "Epic",
+        foreign_keys=[core_epic_id]
+    )
+    
+    # Many to one relationship with core epic
+    core_epic = relationship(
+        "Epic",
+        foreign_keys=[core_epic_id],
+        remote_side=[id]
+    )
 
 class EpicRelation(Base):
     __tablename__ = "epic_relations"
@@ -47,6 +58,9 @@ class EpicResponse(EpicBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    depth: int = 0
+    core_epic_id: Optional[int] = None
+    subs: List["EpicResponse"] = []
 
     class Config:
         orm_mode = True
@@ -57,4 +71,29 @@ class EpicRelationCreate(BaseModel):
     position_row: int
     position_col: int
     depth: int = 1
+
+# Epic 객체를 EpicResponse로 변환하는 함수
+def to_epic_response(epic: "Epic") -> EpicResponse:
+    # subs가 None이거나 예상과 다른 형태일 때를 대비하여 안전하게 처리
+    subs_list = []
+    if hasattr(epic, 'subs') and epic.subs is not None:
+        try:
+            subs_list = [to_epic_response(sub) for sub in epic.subs]
+        except Exception as e:
+            print(f"Warning: Error processing subs for epic {epic.id}: {e}")
+            subs_list = []
+    
+    return EpicResponse(
+        id=epic.id,
+        title=epic.title,
+        description=epic.description,
+        status=epic.status,
+        depth=epic.depth,
+        core_epic_id=epic.core_epic_id,
+        created_at=epic.created_at,
+        updated_at=epic.updated_at,
+        subs=subs_list
+    )
+
+EpicResponse.update_forward_refs()
 
