@@ -54,6 +54,13 @@ class EpicBase(BaseModel):
 class EpicCreate(EpicBase):
     core_epic_id: Optional[int] = None
 
+class EpicUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    depth: Optional[int] = None
+    core_epic_id: Optional[int] = None
+
 class EpicResponse(EpicBase):
     id: int
     created_at: datetime

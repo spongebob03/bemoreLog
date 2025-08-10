@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
-from ..models.epic import Epic, EpicCreate, EpicResponse, to_epic_response
+from ..models.epic import Epic, EpicCreate, EpicUpdate, EpicResponse, to_epic_response
 
 class EpicService:
     def __init__(self, db: Session):
@@ -23,3 +23,21 @@ class EpicService:
         if epic:
             return to_epic_response(epic)
         return None 
+    
+    async def update_epic(self, epic_id: int, epic: EpicUpdate) -> EpicResponse:
+        db_epic = self.db.query(Epic).filter(Epic.id == epic_id).first()
+        if db_epic:
+            # 값이 있는 필드만 기존 Epic 객체에 업데이트
+            epic_data = epic.dict(exclude_unset=True)
+            for field, value in epic_data.items():
+                if hasattr(db_epic, field):
+                    setattr(db_epic, field, value)
+            
+            # updated_at 필드를 현재 시간으로 설정
+            from datetime import datetime
+            db_epic.updated_at = datetime.now()
+            
+            self.db.commit()
+            self.db.refresh(db_epic)
+            return to_epic_response(db_epic)
+        return None
