@@ -41,3 +41,11 @@ class EpicService:
             self.db.refresh(db_epic)
             return to_epic_response(db_epic)
         return None
+    
+    async def delete_epic(self, epic_id: int) -> EpicResponse:
+        db_epic = self.db.query(Epic).filter(Epic.id == epic_id).first()
+        if db_epic:
+            self.db.delete(db_epic)
+            self.db.commit()
+            return to_epic_response(db_epic)
+        return None
