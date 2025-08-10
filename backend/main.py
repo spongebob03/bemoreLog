@@ -18,6 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers from controllers
+# Include API routes from controllers
 app.include_router(epic.router)
 app.include_router(epic_relation.router)
