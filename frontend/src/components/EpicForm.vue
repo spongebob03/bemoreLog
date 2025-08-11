@@ -64,7 +64,7 @@
         class="btn-primary"
         :disabled="loading"
       >
-        {{ loading ? '생성 중...' : 'Epic 생성' }}
+        {{ submitLabel }}
       </button>
       <button 
         type="button" 
@@ -78,8 +78,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import epicService, { type Epic } from '../services/epicService';
+
+type Mode = 'create' | 'edit';
 
 interface EpicCreate {
   title: string;
@@ -88,9 +90,18 @@ interface EpicCreate {
   core_epic_id?: number | null;
 }
 
+const props = defineProps<{
+  mode?: Mode;
+  initialEpic?: Epic;
+  defaultCoreEpicId?: number | null;
+}>();
+
 const emit = defineEmits<{
   'epic-created': [];
+  'epic-saved': [];
 }>();
+
+const effectiveMode = computed<Mode>(() => props.mode || (props.initialEpic ? 'edit' : 'create'));
 
 const form = ref<EpicCreate>({
   title: '',
@@ -101,6 +112,11 @@ const form = ref<EpicCreate>({
 
 const coreEpics = ref<Epic[]>([]);
 const loading = ref(false);
+
+const submitLabel = computed(() => {
+  if (loading.value) return effectiveMode.value === 'edit' ? '저장 중...' : '생성 중...';
+  return effectiveMode.value === 'edit' ? '저장' : 'Epic 생성';
+});
 
 // Core Epic 목록 로드 (depth 0인 epic들)
 const loadCoreEpics = async () => {
@@ -116,26 +132,26 @@ const loadCoreEpics = async () => {
 const handleSubmit = async () => {
   try {
     loading.value = true;
-    
     const epicData: EpicCreate = {
       title: form.value.title.trim(),
       description: form.value.description.trim(),
       status: form.value.status,
       core_epic_id: form.value.core_epic_id || null
     };
-    
-    await epicService.createEpic(epicData);
-    
-    // 성공 시 폼 초기화 및 이벤트 발생
-    resetForm();
-    emit('epic-created');
-    
-    // Core Epic 목록 새로고침
+
+    if (effectiveMode.value === 'edit' && props.initialEpic) {
+      await epicService.updateEpic(props.initialEpic.id, epicData);
+      emit('epic-saved');
+    } else {
+      await epicService.createEpic(epicData);
+      resetForm();
+      emit('epic-created');
+    }
+
     await loadCoreEpics();
-    
   } catch (error) {
-    console.error('Failed to create epic:', error);
-    alert('Epic 생성에 실패했습니다.');
+    console.error('Failed to submit epic:', error);
+    alert(effectiveMode.value === 'edit' ? 'Epic 저장에 실패했습니다.' : 'Epic 생성에 실패했습니다.');
   } finally {
     loading.value = false;
   }
@@ -150,6 +166,39 @@ const resetForm = () => {
     core_epic_id: null
   };
 };
+
+// initialEpic 변경 시 폼 채우기
+watch(
+  () => props.initialEpic,
+  (epic) => {
+    if (epic) {
+      form.value = {
+        title: epic.title,
+        description: epic.description || '',
+        status: epic.status,
+        core_epic_id: epic.core_epic_id ?? null,
+      };
+    } else {
+      resetForm();
+    }
+  },
+  { immediate: true }
+);
+
+// defaultCoreEpicId가 주어졌고 생성 모드인 경우 core_epic_id 기본 설정
+watch(
+  () => [props.defaultCoreEpicId, effectiveMode.value],
+  ([defaultId, mode]) => {
+    if (mode === 'create') {
+      if (defaultId !== undefined && defaultId !== null) {
+        form.value.core_epic_id = defaultId as number;
+      } else if (form.value.core_epic_id === null) {
+        form.value.core_epic_id = null;
+      }
+    }
+  },
+  { immediate: true }
+);
 
 // 컴포넌트 마운트 시 Core Epic 목록 로드
 onMounted(() => {

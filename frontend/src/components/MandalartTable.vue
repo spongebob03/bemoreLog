@@ -32,41 +32,47 @@
       </div>
     </div>
 
-    <!-- Epic 생성 폼 -->
-    <div class="mt-8 p-4 bg-gray-50 rounded-lg">
-      <h3 class="text-lg font-semibold mb-4">새 Epic 생성</h3>
-      <EpicForm @epic-created="loadEpics" />
-    </div>
+    <!-- 생성 FAB -->
+    <button class="fab" @click="openCreateModal" aria-label="새 Epic 생성">＋</button>
 
-    <!-- 선택된 Epic 상세 정보 -->
-    <div v-if="selectedEpic" class="mt-6 p-4 bg-blue-50 rounded-lg">
-      <h3 class="text-lg font-semibold mb-2">선택된 Epic 상세</h3>
-      <div class="text-sm">
-        <p><strong>제목:</strong> {{ selectedEpic.title }}</p>
-        <p><strong>설명:</strong> {{ selectedEpic.description }}</p>
-        <p><strong>상태:</strong> {{ selectedEpic.status }}</p>
-        <p><strong>깊이:</strong> {{ selectedEpic.depth }}</p>
-        <p><strong>하위 Epic 수:</strong> {{ selectedEpic.subs?.length || 0 }}</p>
-      </div>
-    </div>
+    <!-- 모달 -->
+    <EpicModal 
+      v-if="isModalOpen"
+      :mode="modalMode"
+      :epic="currentEpic"
+      @close="closeModal"
+      @saved="handleSaved"
+      @start-edit="switchToEdit"
+      :default-core-epic-id="modalMode === 'create' ? centerCoreEpicId : null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import EpicCard from './EpicCard.vue';
-import EpicForm from './EpicForm.vue';
+import EpicModal from './EpicModal.vue';
 import epicService, { type Epic } from '../services/epicService';
 
 const epics = ref<Epic[]>([]);
-const selectedEpic = ref<Epic | null>(null);
 const loading = ref(false);
+const isModalOpen = ref(false);
+const modalMode = ref<'view' | 'create' | 'edit'>('view');
+const currentEpic = ref<Epic | null>(null);
+const centerCoreEpicId = ref<number | null>(null);
 
 // Epic 데이터 로드
 const loadEpics = async () => {
   try {
     loading.value = true;
-    epics.value = await epicService.getEpics();
+    const loadedEpics = await epicService.getEpics();
+    epics.value = loadedEpics;
+    console.log('Loaded epics:', loadedEpics);
+    console.log('Core epics:', loadedEpics.filter(epic => epic.depth === 0));
+
+    // 현재 화면의 중앙 Core Epic ID 계산: 임시로 depth 0 중 첫 번째 사용
+    const core = loadedEpics.find(e => e.depth === 0) || null;
+    centerCoreEpicId.value = core ? core.id : null;
   } catch (error) {
     console.error('Failed to load epics:', error);
   } finally {
@@ -90,18 +96,67 @@ const getEpicAtPosition = (row: number, col: number): Epic | null => {
   const centerEpic = coreEpics[0];
   if (!centerEpic || !centerEpic.subs) return null;
   
-  // 3x3 그리드에서 위치 계산
+  // 3x3 그리드에서 위치 계산 (중앙 제외)
   const position = row * 3 + col;
-  if (position < centerEpic.subs.length) {
-    return centerEpic.subs[position];
+  if (position === 4) return null; // 중앙 제외
+  
+  // subs 배열에서 해당 위치의 epic 찾기
+  const subIndex = position > 4 ? position - 1 : position; // 중앙을 제외한 인덱스
+  if (subIndex < centerEpic.subs.length) {
+    const epic = centerEpic.subs[subIndex];
+    console.log(`Position (${row},${col}):`, epic);
+    return epic;
   }
   
+  console.log(`Position (${row},${col}): No epic found, subIndex: ${subIndex}, total subs: ${centerEpic.subs.length}`);
   return null;
 };
 
-// Epic 선택
+const getCenterEpic = (): Epic | null => getEpicAtPosition(1, 1);
+
+// Epic 선택: 뷰 모달 열기
 const selectEpic = (epic: Epic | null) => {
-  selectedEpic.value = epic;
+  currentEpic.value = epic;
+  if (epic) {
+    modalMode.value = 'view';
+  } else {
+    // 빈셀 클릭 시 현재 중앙 epic을 core로 설정
+    centerCoreEpicId.value = getCenterEpic()?.id ?? null;
+    modalMode.value = 'create';
+  }
+  isModalOpen.value = true;
+};
+
+// 생성 모달 열기
+const openCreateModal = () => {
+  currentEpic.value = null;
+  // FAB로 생성 시에도 현재 중앙 epic을 core로 설정
+  centerCoreEpicId.value = getCenterEpic()?.id ?? null;
+  modalMode.value = 'create';
+  isModalOpen.value = true;
+};
+
+// 모달 닫기
+const closeModal = () => {
+  isModalOpen.value = false;
+};
+
+// 저장 후 처리
+const handleSaved = async () => {
+  try {
+    await loadEpics();
+    // 데이터 로드 완료 후 모달 닫기
+    setTimeout(() => {
+      isModalOpen.value = false;
+    }, 100);
+  } catch (error) {
+    console.error('Failed to reload epics:', error);
+  }
+};
+
+// 보기에서 수정으로 전환
+const switchToEdit = () => {
+  modalMode.value = 'edit';
 };
 
 // 컴포넌트 마운트 시 Epic 데이터 로드
@@ -129,5 +184,24 @@ onMounted(() => {
 .mandalart-cell {
   aspect-ratio: 1;
   min-height: 120px;
+}
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 28px;
+  border: none;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+  cursor: pointer;
+}
+
+.fab:hover {
+  background: #2563eb;
 }
 </style>
