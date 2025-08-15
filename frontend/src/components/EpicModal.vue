@@ -23,15 +23,29 @@
         </div>
       </section>
 
-      <section v-else class="modal-body">
+      <section v-else-if="mode === 'create'" class="modal-body">
         <EpicForm
-          :mode="mode === 'edit' ? 'edit' : 'create'"
-          :initialEpic="epic || undefined"
+          :mode="'create'"
+          :initialEpic="undefined"
           :defaultCoreEpicId="defaultCoreEpicId"
-          @epic-saved="handleSaved"
-          @epic-created="handleSaved"
+          :selected-position="selectedPosition"
+          @epic-saved="handleEpicSaved"
+          @epic-created="handleEpicCreated"
         />
       </section>
+
+      <section v-else-if="mode === 'edit' && epic" class="modal-body">
+        <EpicForm
+          :mode="'edit'"
+          :initialEpic="epic"
+          :defaultCoreEpicId="defaultCoreEpicId"
+          :selected-position="selectedPosition"
+          @epic-saved="handleEpicSaved"
+          @epic-created="handleEpicCreated"
+        />
+      </section>
+
+
     </div>
   </div>
 </template>
@@ -42,8 +56,10 @@ import EpicForm from './EpicForm.vue';
 import type { Epic } from '../services/epicService';
 
 interface Props {
-  mode: 'view' | 'create' | 'edit';
+  mode?: 'view' | 'create' | 'edit';
   epic: Epic | null;
+  isCreate?: boolean;
+  selectedPosition?: { row: number; col: number } | null;
   defaultCoreEpicId?: number | null;
 }
 
@@ -52,9 +68,13 @@ const emit = defineEmits<{
   close: [];
   saved: [];
   'start-edit': [];
+  'epic-created': [];
+  'epic-updated': [];
+  'epic-deleted': [];
 }>();
 
 const isMobile = ref(false);
+const isEditMode = ref(false);
 const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
 };
@@ -70,9 +90,16 @@ onUnmounted(() => {
   document.body.style.overflow = '';
 });
 
+const mode = computed<'view' | 'create' | 'edit'>(() => {
+  if (props.isCreate) return 'create';
+  if (isEditMode.value) return 'edit';
+  if (props.epic) return 'view';
+  return 'view';
+});
+
 const headerTitle = computed(() => {
-  if (props.mode === 'create') return '새 Epic 생성';
-  if (props.mode === 'edit') return 'Epic 수정';
+  if (mode.value === 'create') return '새 Epic 생성';
+  if (mode.value === 'edit') return 'Epic 수정';
   return 'Epic 상세';
 });
 
@@ -88,11 +115,23 @@ const statusText = computed(() => {
 });
 
 const handleSaved = () => emit('saved');
-const switchToEdit = () => emit('start-edit');
+const handleEpicSaved = () => {
+  isEditMode.value = false;
+  emit('epic-updated');
+};
+const handleEpicCreated = () => {
+  isEditMode.value = false;
+  emit('epic-created');
+};
+const switchToEdit = () => {
+  // edit 모드로 전환
+  isEditMode.value = true;
+};
 
 // 모달 닫기 시 body overflow 복원
 const handleClose = () => {
   document.body.style.overflow = '';
+  isEditMode.value = false; // edit 모드 초기화
   emit('close');
 };
 </script>

@@ -88,21 +88,17 @@
     </div>
     
     <div class="form-group">
-      <label for="core_epic_id" class="form-label">상위 Epic (선택사항)</label>
-      <select
-        id="core_epic_id"
-        v-model="form.core_epic_id"
-        class="form-select"
-      >
-        <option value="">상위 Epic 없음 (Core Epic)</option>
-        <option 
-          v-for="epic in coreEpics" 
-          :key="epic.id" 
-          :value="epic.id"
-        >
-          {{ epic.title }}
-        </option>
-      </select>
+      <label for="core_epic_id" class="form-label">상위 Epic (자동 설정)</label>
+      <div v-if="form.core_epic_id" class="auto-parent-epic">
+        <div class="parent-epic-info">
+          <span class="parent-epic-title">{{ getParentEpicTitle() }}</span>
+          <span class="auto-set-badge">자동 설정됨</span>
+        </div>
+        <small class="form-help">위치 기반으로 자동 설정되었습니다. 수동으로 변경하려면 위치를 먼저 변경하세요.</small>
+      </div>
+      <div v-else class="no-parent-epic">
+        <span class="no-parent-text">상위 Epic 없음 (Core Epic이거나 위치가 설정되지 않음)</span>
+      </div>
     </div>
     
     <div class="form-actions">
@@ -145,6 +141,7 @@ const props = defineProps<{
   mode?: Mode;
   initialEpic?: Epic;
   defaultCoreEpicId?: number | null;
+  selectedPosition?: { row: number; col: number } | null;
 }>();
 
 const emit = defineEmits<{
@@ -182,14 +179,52 @@ const loadCoreEpics = async () => {
   }
 };
 
+// position을 기반으로 상위 epic 자동 찾기
+const findParentEpicByPosition = (positionX: number, positionY: number): Epic | null => {
+  // depth=0인 epic은 상위 epic이 없음
+  if (form.value.depth === 0) return null;
+  
+  // 해당 위치가 속한 3x3 영역의 중앙 위치 계산
+  const regionRow = Math.floor(positionX / 3);
+  const regionCol = Math.floor(positionY / 3);
+  const regionCenterRow = regionRow * 3 + 1;
+  const regionCenterCol = regionCol * 3 + 1;
+  
+  // 해당 3x3 영역의 중앙에 위치한 epic 찾기
+  const parentEpic = coreEpics.value.find(epic => {
+    if (epic.position) {
+      const match = epic.position.match(/(\d+)\s*,\s*(\d+)/);
+      if (match) {
+        const epicRow = parseInt(match[1]);
+        const epicCol = parseInt(match[2]);
+        return epicRow === regionCenterRow && epicCol === regionCenterCol;
+      }
+    }
+    return false;
+  });
+  
+  return parentEpic || null;
+};
+
 // 폼 제출
 const handleSubmit = async () => {
   try {
     loading.value = true;
+    
     // positionX와 positionY를 사용하여 position 문자열 생성
     const position = (form.value.positionX !== undefined && form.value.positionY !== undefined) 
       ? `(${form.value.positionX}, ${form.value.positionY})` 
       : undefined;
+    
+    // position을 기반으로 상위 epic 자동 설정
+    let coreEpicId = form.value.core_epic_id;
+    if (position && form.value.positionX !== undefined && form.value.positionY !== undefined) {
+      const parentEpic = findParentEpicByPosition(form.value.positionX, form.value.positionY);
+      if (parentEpic) {
+        coreEpicId = parentEpic.id;
+        console.log(`자동으로 상위 epic 설정: ${parentEpic.title} (ID: ${parentEpic.id})`);
+      }
+    }
     
     const epicData: EpicCreate = {
       title: form.value.title.trim(),
@@ -197,7 +232,7 @@ const handleSubmit = async () => {
       status: form.value.status,
       depth: form.value.depth,
       position: position,
-      core_epic_id: form.value.core_epic_id || null
+      core_epic_id: coreEpicId
     };
 
     if (effectiveMode.value === 'edit' && props.initialEpic) {
@@ -278,6 +313,39 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// selectedPosition 변경 시 position 자동 설정
+watch(
+  () => props.selectedPosition,
+  (position) => {
+    if (position && !props.initialEpic) {
+      form.value.positionX = position.row;
+      form.value.positionY = position.col;
+    }
+  },
+  { immediate: true }
+);
+
+// 상위 epic 제목 가져오기
+const getParentEpicTitle = (): string => {
+  if (!form.value.core_epic_id) return '';
+  const parentEpic = coreEpics.value.find(epic => epic.id === form.value.core_epic_id);
+  return parentEpic ? parentEpic.title : '';
+};
+
+// position 변경 시 상위 epic 자동 업데이트
+watch(
+  () => [form.value.positionX, form.value.positionY, form.value.depth],
+  ([positionX, positionY, depth]) => {
+    if (positionX !== undefined && positionY !== undefined && depth !== undefined && depth > 0) {
+      const parentEpic = findParentEpicByPosition(positionX, positionY);
+      if (parentEpic) {
+        form.value.core_epic_id = parentEpic.id;
+        console.log(`Position 변경으로 상위 epic 자동 업데이트: ${parentEpic.title}`);
+      }
+    }
+  }
 );
 
 // 컴포넌트 마운트 시 Core Epic 목록 로드
@@ -372,6 +440,46 @@ onMounted(() => {
   font-size: 12px;
   color: #6b7280;
   margin-top: 4px;
+}
+
+.auto-parent-epic {
+  padding: 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+}
+
+.parent-epic-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.parent-epic-title {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.auto-set-badge {
+  background: #10b981;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.no-parent-epic {
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.no-parent-text {
+  color: #6b7280;
+  font-style: italic;
 }
 
 .form-actions {

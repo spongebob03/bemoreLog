@@ -20,10 +20,18 @@
         :class="getCellClass(Math.floor((index-1)/9), (index-1)%9)"
       >
         <div class="cell-content">
-          <div class="position-label">[{{Math.floor((index-1)/9)}},{{(index-1)%9}}]</div>
-          <div v-if="getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9)" class="epic-info">
-            <div class="epic-title">{{ getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9)?.title }}</div>
-            <div class="epic-depth">Depth: {{ getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9)?.depth }}</div>
+          <EpicCard 
+            v-if="getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9)"
+            :epic="getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9)"
+            :position="`${Math.floor((index-1)/9)},${(index-1)%9}`"
+            @click="selectEpic(getEpicAtPosition(Math.floor((index-1)/9), (index-1)%9), Math.floor((index-1)/9), (index-1)%9)"
+          />
+          <div 
+            v-else 
+            class="position-label clickable-empty"
+            @click="selectEpic(null, Math.floor((index-1)/9), (index-1)%9)"
+          >
+            [{{Math.floor((index-1)/9)}},{{(index-1)%9}}]
           </div>
         </div>
       </div>
@@ -35,16 +43,37 @@
       <div class="region-divider region-divider-vertical region-divider-4"></div>
     </div>
 
+    <!-- Epic Modal -->
+    <EpicModal 
+      v-if="selectedEpic !== null || showCreateModal"
+      :epic="selectedEpic"
+      :is-create="showCreateModal"
+      :selected-position="selectedPosition"
+      @close="closeModal"
+      @saved="handleEpicUpdated"
+      @epic-created="handleEpicCreated"
+      @epic-updated="handleEpicUpdated"
+      @epic-deleted="handleEpicDeleted"
+    />
 
+    <!-- Floating Action Button -->
+    <div class="fab" @click="showCreateModal = true">
+      <span class="fab-icon">+</span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import epicService, { type Epic } from '../services/epicService';
+import EpicCard from './EpicCard.vue';
+import EpicModal from './EpicModal.vue';
 
 const epics = ref<Epic[]>([]);
 const loading = ref(false);
+const selectedEpic = ref<Epic | null>(null);
+const showCreateModal = ref(false);
+const selectedPosition = ref<{row: number, col: number} | null>(null);
 
 // Epic 데이터 로드
 const loadEpics = async () => {
@@ -232,6 +261,49 @@ const getCellClass = (row: number, col: number) => {
   return classes.join(' ');
 };
 
+// Epic 선택
+const selectEpic = (epic: Epic | null, row: number, col: number) => {
+  if (epic) {
+    // 기존 epic 클릭 - 상세 보기 모드
+    selectedEpic.value = epic;
+    showCreateModal.value = false;
+  } else {
+    // 빈 셀 클릭 - 새 epic 생성 모드
+    selectedEpic.value = null;
+    showCreateModal.value = true;
+  }
+  selectedPosition.value = { row, col };
+  console.log(`Selected position [${row}][${col}], Epic:`, epic);
+};
+
+// 모달 닫기
+const closeModal = () => {
+  selectedEpic.value = null;
+  showCreateModal.value = false;
+  selectedPosition.value = null;
+};
+
+// Epic 생성 완료
+const handleEpicCreated = async (newEpic: Epic) => {
+  console.log('Epic created:', newEpic);
+  await loadEpics(); // epic 목록 새로고침
+  closeModal();
+};
+
+// Epic 수정 완료
+const handleEpicUpdated = async (updatedEpic: Epic) => {
+  console.log('Epic updated:', updatedEpic);
+  await loadEpics(); // epic 목록 새로고침
+  closeModal();
+};
+
+// Epic 삭제 완료
+const handleEpicDeleted = async () => {
+  console.log('Epic deleted');
+  await loadEpics(); // epic 목록 새로고침
+  closeModal();
+};
+
 // 컴포넌트 마운트 시 Epic 데이터 로드
 onMounted(() => {
   loadEpics();
@@ -367,6 +439,19 @@ onMounted(() => {
   margin-bottom: 4px;
 }
 
+.clickable-empty {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.clickable-empty:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  transform: scale(1.05);
+}
+
 .epic-info {
   text-align: center;
   margin-top: 4px;
@@ -444,5 +529,33 @@ onMounted(() => {
   color: #3b82f6;
 }
 
+/* Floating Action Button */
+.fab {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.fab-icon {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
 
 </style>
