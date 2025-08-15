@@ -13,6 +13,7 @@
           <div class="detail-meta">
             <span class="badge">상태: {{ statusText }}</span>
             <span class="meta">깊이: {{ epic.depth }}</span>
+            <span class="meta" v-if="epic.position">위치: {{ epic.position }}</span>
             <span class="meta">하위: {{ epic.subs?.length || 0 }}</span>
           </div>
         </div>

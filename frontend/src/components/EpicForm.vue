@@ -40,6 +40,53 @@
       ></textarea>
     </div>
     
+    <div class="form-row">
+      <div class="form-group">
+        <label for="depth" class="form-label">깊이 (Depth)</label>
+        <select
+          id="depth"
+          v-model.number="form.depth"
+          class="form-select"
+        >
+          <option :value="0">0 - Core Epic (최상위)</option>
+          <option :value="1">1 - 하위 Epic</option>
+          <option :value="2">2 - 세부 Epic</option>
+          <option :value="3">3 - 세부 세부 Epic</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="position" class="form-label">위치 (9x9 테이블)</label>
+        <div class="position-inputs">
+          <div class="position-input-group">
+            <label for="position_x" class="position-label">X:</label>
+            <input
+              id="position_x"
+              v-model="form.positionX"
+              type="number"
+              min="0"
+              max="8"
+              class="position-input"
+              placeholder="0-8"
+            />
+          </div>
+          <div class="position-input-group">
+            <label for="position_y" class="position-label">Y:</label>
+            <input
+              id="position_y"
+              v-model="form.positionY"
+              type="number"
+              min="0"
+              max="8"
+              class="position-input"
+              placeholder="0-8"
+            />
+          </div>
+        </div>
+        <small class="form-help">0-8 사이의 값을 입력하세요. 예: X=4, Y=4는 중앙 위치입니다.</small>
+      </div>
+    </div>
+    
     <div class="form-group">
       <label for="core_epic_id" class="form-label">상위 Epic (선택사항)</label>
       <select
@@ -87,6 +134,10 @@ interface EpicCreate {
   title: string;
   description: string;
   status: string;
+  depth: number;
+  position?: string;
+  positionX?: number;
+  positionY?: number;
   core_epic_id?: number | null;
 }
 
@@ -107,6 +158,9 @@ const form = ref<EpicCreate>({
   title: '',
   description: '',
   status: 'todo',
+  depth: 0,
+  positionX: undefined,
+  positionY: undefined,
   core_epic_id: null
 });
 
@@ -132,10 +186,17 @@ const loadCoreEpics = async () => {
 const handleSubmit = async () => {
   try {
     loading.value = true;
+    // positionX와 positionY를 사용하여 position 문자열 생성
+    const position = (form.value.positionX !== undefined && form.value.positionY !== undefined) 
+      ? `(${form.value.positionX}, ${form.value.positionY})` 
+      : undefined;
+    
     const epicData: EpicCreate = {
       title: form.value.title.trim(),
       description: form.value.description.trim(),
       status: form.value.status,
+      depth: form.value.depth,
+      position: position,
       core_epic_id: form.value.core_epic_id || null
     };
 
@@ -163,6 +224,10 @@ const resetForm = () => {
     title: '',
     description: '',
     status: 'todo',
+    depth: 0,
+    position: '',
+    positionX: undefined,
+    positionY: undefined,
     core_epic_id: null
   };
 };
@@ -172,10 +237,25 @@ watch(
   () => props.initialEpic,
   (epic) => {
     if (epic) {
+      // 기존 position 값을 파싱하여 positionX, positionY 설정
+      let positionX = undefined;
+      let positionY = undefined;
+      if (epic.position) {
+        const match = epic.position.match(/\((\d+),\s*(\d+)\)/);
+        if (match) {
+          positionX = parseInt(match[1]);
+          positionY = parseInt(match[2]);
+        }
+      }
+      
       form.value = {
         title: epic.title,
         description: epic.description || '',
         status: epic.status,
+        depth: epic.depth,
+        position: epic.position || '',
+        positionX: positionX,
+        positionY: positionY,
         core_epic_id: epic.core_epic_id ?? null,
       };
     } else {
@@ -252,6 +332,46 @@ onMounted(() => {
 .form-textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.position-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.position-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.position-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.position-input {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  transition: border-color 0.2s ease;
+}
+
+.position-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-help {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
 }
 
 .form-actions {

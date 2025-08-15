@@ -5,14 +5,15 @@
       'empty': !epic,
       'core-epic': epic && epic.depth === 0,
       'sub-epic': epic && epic.depth > 0,
-      'clickable': epic
+      'clickable': epic,
+      'is-compact': isCompact
     }"
     @click="$emit('click')"
   >
     <div v-if="epic" class="epic-content">
       <h3 class="epic-title">{{ epic.title }}</h3>
       <p v-if="epic.description" class="epic-description">
-        {{ truncateDescription(epic.description) }}
+        {{ truncateDescription(epic.description, getMaxLength()) }}
       </p>
       <div class="epic-meta">
         <span class="epic-status" :class="`status-${epic.status}`">
@@ -37,9 +38,10 @@ import { type Epic } from '../services/epicService';
 interface Props {
   epic: Epic | null;
   position: string;
+  isCompact?: boolean;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 defineEmits<{
   click: [];
 }>();
@@ -48,6 +50,11 @@ defineEmits<{
 const truncateDescription = (text: string, maxLength: number = 50): string => {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
+};
+
+// compact 모드에서 사용할 최대 길이
+const getMaxLength = (): number => {
+  return props.isCompact ? 30 : 50;
 };
 
 // 상태 텍스트 변환
@@ -122,12 +129,24 @@ const getStatusText = (status: string): string => {
   line-height: 1.2;
 }
 
+.epic-card:has(.is-compact) .epic-title,
+.epic-card.is-compact .epic-title {
+  font-size: 12px;
+  margin: 0 0 6px 0;
+}
+
 .epic-description {
   font-size: 11px;
   color: #6b7280;
   margin: 0 0 8px 0;
   line-height: 1.3;
   flex-grow: 1;
+}
+
+.epic-card:has(.is-compact) .epic-description,
+.epic-card.is-compact .epic-description {
+  font-size: 10px;
+  margin: 0 0 6px 0;
 }
 
 .epic-meta {
@@ -142,6 +161,12 @@ const getStatusText = (status: string): string => {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
+}
+
+.epic-card:has(.is-compact) .epic-status,
+.epic-card.is-compact .epic-status {
+  font-size: 9px;
+  padding: 1px 4px;
 }
 
 .status-todo {
@@ -170,6 +195,12 @@ const getStatusText = (status: string): string => {
   background: #f3f4f6;
   padding: 1px 4px;
   border-radius: 3px;
+}
+
+.epic-card:has(.is-compact) .epic-subs-count,
+.epic-card.is-compact .epic-subs-count {
+  font-size: 8px;
+  padding: 1px 3px;
 }
 
 .empty-content {

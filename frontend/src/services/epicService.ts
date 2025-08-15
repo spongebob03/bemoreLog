@@ -8,6 +8,7 @@ export interface Epic {
   description: string;
   status: string;
   depth: number;
+  position?: string;  // 9x9 테이블에서의 위치 (예: "4,4", "1,1", "1,4" 등)
   core_epic_id: number | null;
   created_at: string;
   updated_at: string | null;
@@ -18,6 +19,7 @@ export interface EpicCreate {
   title: string;
   description: string;
   status: string;
+  position?: string;
   core_epic_id?: number | null;
 }
 
@@ -26,6 +28,7 @@ export interface EpicUpdate {
   description?: string;
   status?: string;
   depth?: number;
+  position?: string;
   core_epic_id?: number | null;
 }
 

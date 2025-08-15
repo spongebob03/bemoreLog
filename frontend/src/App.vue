@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import MandalartTable from './components/MandalartTable.vue';
+// 라우터를 통해 컴포넌트를 렌더링합니다
 </script>
 
 <template>
   <div id="app">
-    <MandalartTable />
+    <router-view />
   </div>
 </template>
 
