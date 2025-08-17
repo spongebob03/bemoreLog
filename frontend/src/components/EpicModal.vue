@@ -19,9 +19,37 @@
         </div>
         <div class="modal-actions">
           <button class="btn-primary" @click="switchToEdit">수정하기</button>
+          <button 
+            class="btn-danger" 
+            :class="{ 'btn-disabled': epic.subs && epic.subs.length > 0 }"
+            @click="showDeleteConfirm"
+            :disabled="epic.subs && epic.subs.length > 0"
+            :title="epic.subs && epic.subs.length > 0 ? '하위 epic이 있어서 삭제할 수 없습니다' : ''"
+          >
+            삭제하기
+          </button>
           <button class="btn-secondary" @click="handleClose">닫기</button>
         </div>
       </section>
+
+      <!-- 삭제 확인 다이얼로그 -->
+      <div v-if="showDeleteDialog" class="delete-confirm-overlay">
+        <div class="delete-confirm-panel">
+          <h4>Epic 삭제 확인</h4>
+          <p>정말로 "{{ epic?.title }}"을(를) 삭제하시겠습니까?</p>
+          <p v-if="epic?.subs && epic.subs.length > 0" class="warning-text">
+            ⚠️ 이 epic에는 {{ epic.subs.length }}개의 하위 epic이 있습니다. 
+            삭제하면 모든 하위 epic도 함께 삭제됩니다.
+          </p>
+          <p class="warning-text">이 작업은 되돌릴 수 없습니다.</p>
+          <div class="delete-confirm-actions">
+            <button class="btn-danger" @click="confirmDelete" :disabled="isDeleting">
+              {{ isDeleting ? '삭제 중...' : '삭제' }}
+            </button>
+            <button class="btn-secondary" @click="cancelDelete" :disabled="isDeleting">취소</button>
+          </div>
+        </div>
+      </div>
 
       <section v-else-if="mode === 'create'" class="modal-body">
         <EpicForm
@@ -29,6 +57,7 @@
           :initialEpic="undefined"
           :defaultCoreEpicId="defaultCoreEpicId"
           :selected-position="selectedPosition"
+          :grid-index="gridIndex"
           @epic-saved="handleEpicSaved"
           @epic-created="handleEpicCreated"
         />
@@ -40,6 +69,7 @@
           :initialEpic="epic"
           :defaultCoreEpicId="defaultCoreEpicId"
           :selected-position="selectedPosition"
+          :grid-index="gridIndex"
           @epic-saved="handleEpicSaved"
           @epic-created="handleEpicCreated"
         />
@@ -53,6 +83,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import EpicForm from './EpicForm.vue';
+import epicService from '../services/epicService';
 import type { Epic } from '../services/epicService';
 
 interface Props {
@@ -61,6 +92,7 @@ interface Props {
   isCreate?: boolean;
   selectedPosition?: { row: number; col: number } | null;
   defaultCoreEpicId?: number | null;
+  gridIndex?: number;
 }
 
 const props = defineProps<Props>();
@@ -75,6 +107,9 @@ const emit = defineEmits<{
 
 const isMobile = ref(false);
 const isEditMode = ref(false);
+const showDeleteDialog = ref(false);
+const isDeleting = ref(false);
+
 const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
 };
@@ -128,10 +163,37 @@ const switchToEdit = () => {
   isEditMode.value = true;
 };
 
+// 삭제 관련 메서드들
+const showDeleteConfirm = () => {
+  showDeleteDialog.value = true;
+};
+
+const cancelDelete = () => {
+  showDeleteDialog.value = false;
+};
+
+const confirmDelete = async () => {
+  if (!props.epic || isDeleting.value) return;
+  
+  try {
+    isDeleting.value = true;
+    await epicService.deleteEpic(props.epic.id);
+    showDeleteDialog.value = false;
+    emit('epic-deleted');
+    handleClose();
+  } catch (error) {
+    console.error('Epic 삭제 중 오류 발생:', error);
+    alert('Epic 삭제 중 오류가 발생했습니다.');
+  } finally {
+    isDeleting.value = false;
+  }
+};
+
 // 모달 닫기 시 body overflow 복원
 const handleClose = () => {
   document.body.style.overflow = '';
   isEditMode.value = false; // edit 모드 초기화
+  showDeleteDialog.value = false; // 삭제 다이얼로그도 닫기
   emit('close');
 };
 </script>
@@ -239,7 +301,8 @@ const handleClose = () => {
 }
 
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-danger {
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
@@ -257,6 +320,79 @@ const handleClose = () => {
   background: #f3f4f6;
   color: #111827;
   border: 1px solid #e5e7eb;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-disabled {
+  background: #9ca3af !important;
+  color: #6b7280 !important;
+  cursor: not-allowed !important;
+}
+
+.btn-disabled:hover {
+  background: #9ca3af !important;
+}
+
+/* 삭제 확인 다이얼로그 스타일 */
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.delete-confirm-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.delete-confirm-panel h4 {
+  margin: 0 0 16px 0;
+  color: #dc2626;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.delete-confirm-panel p {
+  margin: 0 0 8px 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.warning-text {
+  color: #dc2626 !important;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.delete-confirm-actions .btn-danger {
+  flex: 1;
+}
+
+.delete-confirm-actions .btn-secondary {
+  flex: 1;
 }
 
 @media (max-width: 640px) {

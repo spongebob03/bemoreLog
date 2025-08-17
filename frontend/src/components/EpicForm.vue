@@ -42,48 +42,34 @@
     
     <div class="form-row">
       <div class="form-group">
-        <label for="depth" class="form-label">깊이 (Depth)</label>
-        <select
-          id="depth"
-          v-model.number="form.depth"
-          class="form-select"
-        >
-          <option :value="0">0 - Core Epic (최상위)</option>
-          <option :value="1">1 - 하위 Epic</option>
-          <option :value="2">2 - 세부 Epic</option>
-          <option :value="3">3 - 세부 세부 Epic</option>
-        </select>
+        <label for="depth" class="form-label">깊이 (Depth) - 자동 설정</label>
+        <div class="readonly-field">
+          <span class="readonly-value">{{ getDepthText() }}</span>
+          <span class="auto-set-badge">자동 설정됨</span>
+        </div>
+        <small class="form-help">{{ getDepthHelpText() }}</small>
       </div>
       
       <div class="form-group">
-        <label for="position" class="form-label">위치 (9x9 테이블)</label>
-        <div class="position-inputs">
-          <div class="position-input-group">
-            <label for="position_x" class="position-label">X:</label>
-            <input
-              id="position_x"
-              v-model="form.positionX"
-              type="number"
-              min="0"
-              max="8"
-              class="position-input"
-              placeholder="0-8"
-            />
-          </div>
-          <div class="position-input-group">
-            <label for="position_y" class="position-label">Y:</label>
-            <input
-              id="position_y"
-              v-model="form.positionY"
-              type="number"
-              min="0"
-              max="8"
-              class="position-input"
-              placeholder="0-8"
-            />
-          </div>
+        <label for="position" class="form-label">위치 (시계방향 번호) - 자동 설정</label>
+        <div class="readonly-field">
+          <span class="readonly-value">{{ getPositionText() }}</span>
+          <span class="auto-set-badge">자동 설정됨</span>
         </div>
-        <small class="form-help">0-8 사이의 값을 입력하세요. 예: X=4, Y=4는 중앙 위치입니다.</small>
+        <div class="position-visual-help">
+          <div class="position-grid">
+            <div class="position-cell">1</div>
+            <div class="position-cell">2</div>
+            <div class="position-cell">3</div>
+            <div class="position-cell">8</div>
+            <div class="position-cell center">0</div>
+            <div class="position-cell">4</div>
+            <div class="position-cell">7</div>
+            <div class="position-cell">6</div>
+            <div class="position-cell">5</div>
+          </div>
+          <small>시계방향 위치 번호</small>
+        </div>
       </div>
     </div>
     
@@ -94,10 +80,12 @@
           <span class="parent-epic-title">{{ getParentEpicTitle() }}</span>
           <span class="auto-set-badge">자동 설정됨</span>
         </div>
-        <small class="form-help">위치 기반으로 자동 설정되었습니다. 수동으로 변경하려면 위치를 먼저 변경하세요.</small>
+        <small class="form-help">
+          {{ getParentEpicHelpText() }}
+        </small>
       </div>
       <div v-else class="no-parent-epic">
-        <span class="no-parent-text">상위 Epic 없음 (Core Epic이거나 위치가 설정되지 않음)</span>
+        <span class="no-parent-text">{{ getNoParentEpicText() }}</span>
       </div>
     </div>
     
@@ -131,9 +119,7 @@ interface EpicCreate {
   description: string;
   status: string;
   depth: number;
-  position?: string;
-  positionX?: number;
-  positionY?: number;
+  position?: number;
   core_epic_id?: number | null;
 }
 
@@ -141,7 +127,8 @@ const props = defineProps<{
   mode?: Mode;
   initialEpic?: Epic;
   defaultCoreEpicId?: number | null;
-  selectedPosition?: { row: number; col: number } | null;
+  selectedPosition?: { row: number; col: number } | null; // 3x3 그리드 내 상대 위치 (0-2, 0-2)
+  gridIndex?: number; // 3x3 그리드의 인덱스 (0-8)
 }>();
 
 const emit = defineEmits<{
@@ -156,8 +143,7 @@ const form = ref<EpicCreate>({
   description: '',
   status: 'todo',
   depth: 0,
-  positionX: undefined,
-  positionY: undefined,
+  position: 0,
   core_epic_id: null
 });
 
@@ -169,41 +155,70 @@ const submitLabel = computed(() => {
   return effectiveMode.value === 'edit' ? '저장' : 'Epic 생성';
 });
 
-// Core Epic 목록 로드 (depth 0인 epic들)
+// Core Epic 목록 로드 (depth 0과 1인 epic들 - 상위 epic으로 사용)
 const loadCoreEpics = async () => {
   try {
     const allEpics = await epicService.getEpics();
-    coreEpics.value = allEpics.filter(epic => epic.depth === 0);
+    // depth=0 (core epic)과 depth=1 (sub epic)을 모두 포함
+    coreEpics.value = allEpics.filter(epic => epic.depth === 0 || epic.depth === 1);
+    console.log('Loaded core epics for parent selection:', coreEpics.value.map(e => `${e.title} (depth: ${e.depth}) at ${e.position}`));
   } catch (error) {
     console.error('Failed to load core epics:', error);
   }
 };
 
 // position을 기반으로 상위 epic 자동 찾기
-const findParentEpicByPosition = (positionX: number, positionY: number): Epic | null => {
+const findParentEpicByPosition = (position: number): Epic | null => {
   // depth=0인 epic은 상위 epic이 없음
   if (form.value.depth === 0) return null;
   
-  // 해당 위치가 속한 3x3 영역의 중앙 위치 계산
-  const regionRow = Math.floor(positionX / 3);
-  const regionCol = Math.floor(positionY / 3);
-  const regionCenterRow = regionRow * 3 + 1;
-  const regionCenterCol = regionCol * 3 + 1;
+  console.log(`Position ${position} -> Looking for parent epic with depth ${form.value.depth - 1}`);
+  console.log(`Grid Index: ${props.gridIndex}`);
   
-  // 해당 3x3 영역의 중앙에 위치한 epic 찾기
-  const parentEpic = coreEpics.value.find(epic => {
-    if (epic.position) {
-      const match = epic.position.match(/(\d+)\s*,\s*(\d+)/);
-      if (match) {
-        const epicRow = parseInt(match[1]);
-        const epicCol = parseInt(match[2]);
-        return epicRow === regionCenterRow && epicCol === regionCenterCol;
-      }
+  // gridIndex를 기반으로 상위 epic 찾기
+  let parentEpic: Epic | null = null;
+  
+  if (props.gridIndex === 4) {
+    // 중앙 그리드에서 생성하는 경우
+    if (form.value.depth === 1) {
+      // depth=1 epic의 상위는 depth=0 epic (중앙)
+      parentEpic = coreEpics.value.find(epic => epic.depth === 0 && epic.position === 0) || null;
     }
-    return false;
-  });
+  } else {
+    // 주변 그리드에서 생성하는 경우
+    if (form.value.depth === 2) {
+      // depth=2 epic의 상위는 해당 그리드의 중앙에 있는 depth=1 epic
+      // gridIndex를 position으로 변환하여 찾기
+      let targetPosition = 0;
+      switch (props.gridIndex) {
+        case 0: targetPosition = 1; break; // 좌상단
+        case 1: targetPosition = 2; break; // 상단
+        case 2: targetPosition = 3; break; // 우상단
+        case 3: targetPosition = 8; break; // 좌측
+        case 5: targetPosition = 4; break; // 우측
+        case 6: targetPosition = 7; break; // 좌하단
+        case 7: targetPosition = 6; break; // 하단
+        case 8: targetPosition = 5; break; // 우하단
+        default: targetPosition = 0;
+      }
+      
+      // 해당 position을 가진 depth=1 epic 찾기
+      parentEpic = coreEpics.value.find(epic => 
+        epic.depth === 1 && epic.position === targetPosition
+      ) || null;
+      
+      console.log(`Looking for depth=1 epic with position ${targetPosition} in grid ${props.gridIndex}`);
+    }
+  }
   
-  return parentEpic || null;
+  if (!parentEpic) {
+    console.log(`No parent epic found for position ${position} with depth ${form.value.depth} in grid ${props.gridIndex}`);
+    console.log('Available core epics:', coreEpics.value.map(e => `${e.title} (depth: ${e.depth}) at ${e.position}`));
+  } else {
+    console.log(`Found parent epic: ${parentEpic.title} (depth: ${parentEpic.depth}, position: ${parentEpic.position})`);
+  }
+  
+  return parentEpic;
 };
 
 // 폼 제출
@@ -211,27 +226,30 @@ const handleSubmit = async () => {
   try {
     loading.value = true;
     
-    // positionX와 positionY를 사용하여 position 문자열 생성
-    const position = (form.value.positionX !== undefined && form.value.positionY !== undefined) 
-      ? `(${form.value.positionX}, ${form.value.positionY})` 
-      : undefined;
-    
     // position을 기반으로 상위 epic 자동 설정
     let coreEpicId = form.value.core_epic_id;
-    if (position && form.value.positionX !== undefined && form.value.positionY !== undefined) {
-      const parentEpic = findParentEpicByPosition(form.value.positionX, form.value.positionY);
+    if (form.value.position !== undefined) {
+      const parentEpic = findParentEpicByPosition(form.value.position);
       if (parentEpic) {
         coreEpicId = parentEpic.id;
         console.log(`자동으로 상위 epic 설정: ${parentEpic.title} (ID: ${parentEpic.id})`);
       }
     }
     
+    // 폼 제출 전 depth와 position 값 확인
+    console.log(`=== Epic 제출 전 폼 데이터 ===`);
+    console.log(`Title: ${form.value.title}`);
+    console.log(`Depth: ${form.value.depth}`);
+    console.log(`Position: ${form.value.position}`);
+    console.log(`Core Epic ID: ${coreEpicId}`);
+    console.log(`===============================`);
+    
     const epicData: EpicCreate = {
       title: form.value.title.trim(),
       description: form.value.description.trim(),
       status: form.value.status,
       depth: form.value.depth,
-      position: position,
+      position: form.value.position,
       core_epic_id: coreEpicId
     };
 
@@ -260,9 +278,7 @@ const resetForm = () => {
     description: '',
     status: 'todo',
     depth: 0,
-    position: '',
-    positionX: undefined,
-    positionY: undefined,
+    position: 0,
     core_epic_id: null
   };
 };
@@ -272,25 +288,12 @@ watch(
   () => props.initialEpic,
   (epic) => {
     if (epic) {
-      // 기존 position 값을 파싱하여 positionX, positionY 설정
-      let positionX = undefined;
-      let positionY = undefined;
-      if (epic.position) {
-        const match = epic.position.match(/\((\d+),\s*(\d+)\)/);
-        if (match) {
-          positionX = parseInt(match[1]);
-          positionY = parseInt(match[2]);
-        }
-      }
-      
       form.value = {
         title: epic.title,
         description: epic.description || '',
         status: epic.status,
         depth: epic.depth,
-        position: epic.position || '',
-        positionX: positionX,
-        positionY: positionY,
+        position: epic.position || 0,
         core_epic_id: epic.core_epic_id ?? null,
       };
     } else {
@@ -315,13 +318,60 @@ watch(
   { immediate: true }
 );
 
-// selectedPosition 변경 시 position 자동 설정
+// selectedPosition 변경 시 position과 depth 자동 설정
 watch(
   () => props.selectedPosition,
   (position) => {
     if (position && !props.initialEpic) {
-      form.value.positionX = position.row;
-      form.value.positionY = position.col;
+      // row, col을 시계방향 위치 번호로 변환
+      // 3x3 그리드 내에서의 상대 위치를 시계방향 번호로 변환
+      let relativePosition = 0;
+      if (position.row === 0 && position.col === 0) relativePosition = 1;      // 좌상단
+      else if (position.row === 0 && position.col === 1) relativePosition = 2;  // 상단
+      else if (position.row === 0 && position.col === 2) relativePosition = 3;  // 우상단
+      else if (position.row === 1 && position.col === 2) relativePosition = 4;  // 우측
+      else if (position.row === 2 && position.col === 2) relativePosition = 5;  // 우하단
+      else if (position.row === 2 && position.col === 1) relativePosition = 6;  // 하단
+      else if (position.row === 2 && position.col === 0) relativePosition = 7;  // 좌하단
+      else if (position.row === 1 && position.col === 0) relativePosition = 8;  // 좌측
+      else if (position.row === 1 && position.col === 1) relativePosition = 0;  // 중앙
+      
+      console.log(`Selected position [${position.row}, ${position.col}] -> 시계방향 번호: ${relativePosition}`);
+      form.value.position = relativePosition;
+      
+      // 위치에 따른 depth 자동 설정
+      if (relativePosition === 0) {
+        // 중앙 셀은 해당 3x3 그리드의 core epic
+        if (props.gridIndex === 4) {
+          // 중앙부 3x3 그리드 (index 4)의 중앙 → depth=0 (최상위 Core Epic)
+          form.value.depth = 0;
+        } else {
+          // 주변부 3x3 그리드의 중앙 → depth=1 (중앙부 3x3의 1~8번 epic)
+          form.value.depth = 1;
+        }
+      } else {
+        // 주변 셀은 해당 3x3 그리드의 subs epic
+        if (props.gridIndex === 4) {
+          // 중앙부 3x3 그리드의 주변 셀 → depth=1 (중앙부 3x3의 subs epic)
+          form.value.depth = 1;
+        } else {
+          // 주변부 3x3 그리드의 주변 셀 → depth=2 (주변부 3x3의 subs epic)
+          form.value.depth = 2;
+        }
+      }
+      
+      console.log(`=== Depth 자동 설정 디버깅 ===`);
+      console.log(`Grid Index: ${props.gridIndex}`);
+      console.log(`Selected Position: [${props.selectedPosition?.row}, ${props.selectedPosition?.col}]`);
+      console.log(`Relative Position: ${relativePosition}`);
+      console.log(`Is Center Cell: ${relativePosition === 0}`);
+      console.log(`Is Center Grid: ${props.gridIndex === 4}`);
+      console.log(`Form Depth Before: ${form.value.depth}`);
+      
+      // depth 설정 후 확인
+      console.log(`Form Depth After: ${form.value.depth}`);
+      console.log(`Form Position: ${form.value.position}`);
+      console.log(`===============================`);
     }
   },
   { immediate: true }
@@ -334,12 +384,76 @@ const getParentEpicTitle = (): string => {
   return parentEpic ? parentEpic.title : '';
 };
 
+// 상위 epic 도움말 텍스트 가져오기
+const getParentEpicHelpText = (): string => {
+  if (!form.value.core_epic_id) return '';
+  const parentEpic = coreEpics.value.find(epic => epic.id === form.value.core_epic_id);
+  if (!parentEpic) return '';
+  
+  if (parentEpic.depth === 0) {
+    return 'Core Epic (depth=0)이 상위 epic으로 설정되었습니다.';
+  } else if (parentEpic.depth === 1) {
+    return 'Sub Epic (depth=1)이 상위 epic으로 설정되었습니다.';
+  }
+  return '위치 기반으로 자동 설정되었습니다. 수동으로 변경하려면 위치를 먼저 변경하세요.';
+};
+
+// 상위 epic이 없을 때 텍스트 가져오기
+const getNoParentEpicText = (): string => {
+  if (form.value.depth === 0) {
+    return 'Core Epic (depth=0)은 상위 epic이 없습니다.';
+  } else if (form.value.depth === 1) {
+    return '위치를 설정하면 Core Epic (depth=0)이 자동으로 상위 epic으로 설정됩니다.';
+  } else if (form.value.depth === 2) {
+    return '위치를 설정하면 Sub Epic (depth=1)이 자동으로 상위 epic으로 설정됩니다.';
+  }
+  return '위치를 설정하면 적절한 상위 epic이 자동으로 설정됩니다.';
+};
+
+// Depth 텍스트 가져오기
+const getDepthText = (): string => {
+  switch (form.value.depth) {
+    case 0: return '0 - Core Epic (최상위)';
+    case 1: return '1 - 하위 Epic';
+    case 2: return '2 - 세부 Epic';
+    case 3: return '3 - 세부 세부 Epic';
+    default: return `${form.value.depth} - Epic`;
+  }
+};
+
+// Depth 도움말 텍스트 가져오기
+const getDepthHelpText = (): string => {
+  switch (form.value.depth) {
+    case 0: return 'Core Epic은 최상위 Epic으로, 다른 Epic의 상위가 될 수 있습니다.';
+    case 1: return '하위 Epic은 Core Epic의 직접적인 하위 Epic입니다.';
+    case 2: return '세부 Epic은 하위 Epic의 세부 Epic입니다.';
+    case 3: return '세부 세부 Epic은 가장 하위 레벨의 Epic입니다.';
+    default: return 'Epic의 계층 레벨입니다.';
+  }
+};
+
+// Position 텍스트 가져오기
+const getPositionText = (): string => {
+  switch (form.value.position) {
+    case 0: return '0 - 중앙';
+    case 1: return '1 - 좌상단';
+    case 2: return '2 - 상단';
+    case 3: return '3 - 우상단';
+    case 4: return '4 - 우측';
+    case 5: return '5 - 우하단';
+    case 6: return '6 - 하단';
+    case 7: return '7 - 좌하단';
+    case 8: return '8 - 좌측';
+    default: return `${form.value.position} - 위치`;
+  }
+};
+
 // position 변경 시 상위 epic 자동 업데이트
 watch(
-  () => [form.value.positionX, form.value.positionY, form.value.depth],
-  ([positionX, positionY, depth]) => {
-    if (positionX !== undefined && positionY !== undefined && depth !== undefined && depth > 0) {
-      const parentEpic = findParentEpicByPosition(positionX, positionY);
+  () => [form.value.position, form.value.depth],
+  ([position, depth]) => {
+    if (position !== undefined && depth !== undefined && depth > 0) {
+      const parentEpic = findParentEpicByPosition(position);
       if (parentEpic) {
         form.value.core_epic_id = parentEpic.id;
         console.log(`Position 변경으로 상위 epic 자동 업데이트: ${parentEpic.title}`);
@@ -440,6 +554,56 @@ onMounted(() => {
   font-size: 12px;
   color: #6b7280;
   margin-top: 4px;
+}
+
+.readonly-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  min-height: 42px;
+}
+
+.readonly-value {
+  font-weight: 500;
+  color: #374151;
+  flex: 1;
+}
+
+.position-visual-help {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  max-width: 120px;
+  margin: 0 auto 8px;
+}
+
+.position-cell {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.position-cell.center {
+  background: #3b82f6;
+  color: white;
+  border-color: #2563eb;
 }
 
 .auto-parent-epic {
