@@ -8,7 +8,13 @@ class EpicService:
         self.db = db
 
     async def create_epic(self, epic: EpicCreate) -> EpicResponse:
-        db_epic = Epic(**epic.dict())
+        # core_epic_id가 있을 때 depth 값을 자동으로 설정
+        epic_data = epic.dict()
+        if epic.core_epic_id:
+            core_epic = self.db.query(Epic).filter(Epic.id == epic.core_epic_id).first()
+            epic_data['depth'] = core_epic.depth + 1 if core_epic else 0
+        
+        db_epic = Epic(**epic_data)
         self.db.add(db_epic)
         self.db.commit()
         self.db.refresh(db_epic)
@@ -49,3 +55,10 @@ class EpicService:
             self.db.commit()
             return to_epic_response(db_epic)
         return None
+    
+    async def delete_all_epics(self) -> dict:
+        """모든 epic을 삭제합니다."""
+        count = self.db.query(Epic).count()
+        self.db.query(Epic).delete()
+        self.db.commit()
+        return {"message": f"All {count} epics deleted successfully"}
