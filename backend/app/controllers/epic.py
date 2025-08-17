@@ -53,6 +53,12 @@ class EpicController:
             return await self.service.delete_epic(epic_id)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+    
+    async def delete_all_epics(self) -> dict:
+        try:
+            return await self.service.delete_all_epics()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 # Route handlers
 @router.post("", response_model=EpicResponse)
@@ -96,3 +102,10 @@ async def delete_epic(
 ):
     controller = EpicController(db)
     return await controller.delete_epic(epic_id)
+
+@router.delete("", response_model=dict)
+async def delete_all_epics(
+    db: Session = Depends(get_db_override)
+):
+    controller = EpicController(db)
+    return await controller.delete_all_epics()
