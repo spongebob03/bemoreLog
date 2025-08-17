@@ -51,10 +51,27 @@ class EpicService:
     async def delete_epic(self, epic_id: int) -> EpicResponse:
         db_epic = self.db.query(Epic).filter(Epic.id == epic_id).first()
         if db_epic:
+            # 하위 epic들도 함께 삭제
+            self._delete_sub_epics(db_epic.id)
+            
+            # 메인 epic 삭제
             self.db.delete(db_epic)
             self.db.commit()
             return to_epic_response(db_epic)
         return None
+    
+    def _delete_sub_epics(self, epic_id: int):
+        """하위 epic들을 재귀적으로 삭제합니다."""
+        # 해당 epic을 상위 epic으로 하는 모든 하위 epic 조회
+        sub_epics = self.db.query(Epic).filter(Epic.core_epic_id == epic_id).all()
+        
+        for sub_epic in sub_epics:
+            # 재귀적으로 하위 epic들 삭제
+            self._delete_sub_epics(sub_epic.id)
+            # 하위 epic 삭제
+            self.db.delete(sub_epic)
+        
+        print(f"Deleted {len(sub_epics)} sub epics for epic {epic_id}")
     
     async def delete_all_epics(self) -> dict:
         """모든 epic을 삭제합니다."""

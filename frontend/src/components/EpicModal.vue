@@ -21,10 +21,8 @@
           <button class="btn-primary" @click="switchToEdit">수정하기</button>
           <button 
             class="btn-danger" 
-            :class="{ 'btn-disabled': epic.subs && epic.subs.length > 0 }"
             @click="showDeleteConfirm"
-            :disabled="epic.subs && epic.subs.length > 0"
-            :title="epic.subs && epic.subs.length > 0 ? '하위 epic이 있어서 삭제할 수 없습니다' : ''"
+            :title="hasSubEpics ? '하위 epic이 있어도 함께 삭제됩니다' : ''"
           >
             삭제하기
           </button>
@@ -37,8 +35,8 @@
         <div class="delete-confirm-panel">
           <h4>Epic 삭제 확인</h4>
           <p>정말로 "{{ epic?.title }}"을(를) 삭제하시겠습니까?</p>
-          <p v-if="epic?.subs && epic.subs.length > 0" class="warning-text">
-            ⚠️ 이 epic에는 {{ epic.subs.length }}개의 하위 epic이 있습니다. 
+          <p v-if="hasSubEpics" class="warning-text">
+            ⚠️ 이 epic에는 {{ epic?.subs?.length || 0 }}개의 하위 epic이 있습니다. 
             삭제하면 모든 하위 epic도 함께 삭제됩니다.
           </p>
           <p class="warning-text">이 작업은 되돌릴 수 없습니다.</p>
@@ -147,6 +145,12 @@ const statusText = computed(() => {
     blocked: '차단됨',
   };
   return statusMap[props.epic.status] || props.epic.status;
+});
+
+// 하위 epic이 있는지 안전하게 확인
+const hasSubEpics = computed(() => {
+  if (!props.epic || !props.epic.subs) return false;
+  return Array.isArray(props.epic.subs) && props.epic.subs.length > 0;
 });
 
 const handleSaved = () => emit('saved');
