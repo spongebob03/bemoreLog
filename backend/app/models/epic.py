@@ -18,6 +18,7 @@ class Epic(Base):
     description = Column(String)
     status = Column(String)
     depth = Column(Integer, default=0)
+    position = Column(Integer, nullable=True)  # 3x3 그리드 내 시계방향 위치 (0: 중앙, 1-8: 주변)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     core_epic_id = Column(Integer, ForeignKey("epics.id"), nullable=True)
@@ -53,12 +54,14 @@ class EpicBase(BaseModel):
 
 class EpicCreate(EpicBase):
     core_epic_id: Optional[int] = None
+    position: Optional[int] = None
 
 class EpicUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = None
     depth: Optional[int] = None
+    position: Optional[int] = None
     core_epic_id: Optional[int] = None
 
 class EpicResponse(EpicBase):
@@ -66,6 +69,7 @@ class EpicResponse(EpicBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     depth: int = 0
+    position: Optional[int] = None
     core_epic_id: Optional[int] = None
     subs: List["EpicResponse"] = []
 
@@ -96,6 +100,7 @@ def to_epic_response(epic: "Epic") -> EpicResponse:
         description=epic.description,
         status=epic.status,
         depth=epic.depth,
+        position=epic.position,
         core_epic_id=epic.core_epic_id,
         created_at=epic.created_at,
         updated_at=epic.updated_at,
