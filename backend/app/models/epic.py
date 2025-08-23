@@ -36,6 +36,9 @@ class Epic(Base):
         foreign_keys=[core_epic_id],
         remote_side=[id]
     )
+    
+    # One to many relationship with Habits
+    habits = relationship("Habit", back_populates="epic")
 
 class EpicRelation(Base):
     __tablename__ = "epic_relations"

@@ -20,7 +20,7 @@ class Habit(Base):
     __tablename__ = "habits"
 
     id = Column(Integer, primary_key=True, index=True)
-    epic_id = Column(Integer, ForeignKey("epics.id"), nullable=True)
+    epic_id = Column(Integer, ForeignKey("epics.id"), nullable=True)  # 1:N 관계 (확장성)
 
     title = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
@@ -38,7 +38,7 @@ class Habit(Base):
     commits = relationship("HabitCommit", back_populates="habit")
     
     # Many to one relationship with Epic
-    epic = relationship("Epic", foreign_keys=[epic_id])
+    epic = relationship("Epic", back_populates="habits")
 
 class HabitCommit(Base):
     __tablename__ = "habit_commits"
@@ -54,3 +54,71 @@ class HabitCommit(Base):
 
     # Many to one relationship with Habit
     habit = relationship("Habit", back_populates="commits")
+
+# Pydantic Models
+class HabitBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    schedule: Optional[str] = None  # cron 표현식
+    target_count: int = 1
+    epic_id: Optional[int] = None  # Epic 없이도 독립적인 습관 가능
+
+class HabitCreate(HabitBase):
+    pass
+
+class HabitUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    schedule: Optional[str] = None
+    target_count: Optional[int] = None
+    status: Optional[HabitStatus] = None
+    epic_id: Optional[int] = None  # 업데이트 시에는 선택적
+
+class HabitResponse(HabitBase):
+    id: int
+    status: HabitStatus
+    current_combo: int = 0
+    best_combo: int = 0
+    total_completions: int = 0
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+
+class HabitCommitBase(BaseModel):
+    habit_id: int
+    description: Optional[str] = None
+    effort: int  # 1-5 사이의 값
+
+class HabitCommitCreate(HabitCommitBase):
+    pass
+
+class HabitCommitUpdate(BaseModel):
+    description: Optional[str] = None
+    effort: Optional[int] = None
+
+class HabitCommitResponse(HabitCommitBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+
+# Utility functions
+def to_habit_response(habit: "Habit") -> HabitResponse:
+    return HabitResponse(
+        id=habit.id,
+        title=habit.title,
+        description=habit.description,
+        schedule=habit.schedule,
+        target_count=habit.target_count,
+        epic_id=habit.epic_id,
+        status=HabitStatus(habit.status),
+        current_combo=habit.current_combo,
+        best_combo=habit.best_combo,
+        total_completions=habit.total_completions,
+        created_at=habit.created_at,
+        updated_at=habit.updated_at
+    )
