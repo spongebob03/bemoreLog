@@ -1,79 +1,86 @@
 <template>
-  <div class="habit-dashboard">
-    <div class="dashboard-header">
-      <div class="habit-info">
-        <h2 class="habit-title">{{ habit?.title }}</h2>
-        <p class="habit-description">{{ habit?.description }}</p>
-        <div class="habit-meta">
-          <span class="habit-status" :class="`status-${habit?.status}`">
-            {{ getStatusText(habit?.status) }}
-          </span>
-          <span class="habit-schedule">{{ formatSchedule(habit?.schedule) }}</span>
+  <div class="modal-backdrop" @click="$emit('close')">
+    <div class="habit-dashboard" @click.stop>
+      <div class="dashboard-header">
+        <!-- 닫기 버튼 -->
+        <button class="close-btn" @click="$emit('close')">&times;</button>
+        
+        <div class="habit-info">
+          <h2 class="habit-title">{{ habit?.title }}</h2>
+          <p class="habit-description">{{ habit?.description }}</p>
+          <div class="habit-meta">
+            <span class="habit-status" :class="`status-${habit?.status}`">
+              {{ getStatusText(habit?.status) }}
+            </span>
+            <span class="habit-schedule">{{ formatSchedule(habit?.schedule) }}</span>
+          </div>
+        </div>
+        
+        <div class="habit-stats">
+          <div class="stat-item">
+            <span class="stat-value">{{ habit?.current_combo }}</span>
+            <span class="stat-label">현재 연속</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ habit?.best_combo }}</span>
+            <span class="stat-label">최고 연속</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">{{ habit?.total_completions }}</span>
+            <span class="stat-label">총 실천</span>
+          </div>
         </div>
       </div>
-      
-      <div class="habit-stats">
-        <div class="stat-item">
-          <span class="stat-value">{{ habit?.current_combo }}</span>
-          <span class="stat-label">현재 연속</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ habit?.best_combo }}</span>
-          <span class="stat-label">최고 연속</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-value">{{ habit?.total_completions }}</span>
-          <span class="stat-label">총 실천</span>
-        </div>
-      </div>
-    </div>
 
-    <div class="dashboard-controls">
-      <div class="view-switcher">
-        <button 
-          class="switch-btn"
-          :class="{ active: viewMode === 'github' }"
-          @click="viewMode = 'github'"
-        >
-          🟩 잔디 뷰
-        </button>
-        <button 
+      <div class="dashboard-controls">
+        <div class="view-switcher">
+          <button 
+            class="switch-btn"
+            :class="{ active: viewMode === 'github' }"
+            @click="viewMode = 'github'"
+          >
+            🟩 잔디 뷰
+          </button>
+                  <button 
           class="switch-btn"
           :class="{ active: viewMode === 'grape' }"
           @click="viewMode = 'grape'"
-          disabled
         >
-          🍇 포도 뷰 (준비중)
+          🍇 포도송이 뷰
+        </button>
+        </div>
+        
+        <button class="add-commit-btn" @click="showCommitForm = true">
+          ➕ 실천 기록
         </button>
       </div>
-      
-      <button class="add-commit-btn" @click="showCommitForm = true">
-        ➕ 실천 기록
-      </button>
+
+      <!-- 깃허브 잔디 스타일 뷰 -->
+      <HabitGithubGrassView 
+        v-if="viewMode === 'github'"
+        :habit-id="habitId"
+        :commits="commits"
+        @date-click="handleDateClick"
+      />
+
+      <!-- 포도송이 스타일 뷰 -->
+      <HabitGrapeView 
+        v-if="viewMode === 'grape'"
+        :habit-id="habitId"
+        :commits="commits"
+        @date-click="handleDateClick"
+      />
+
+      <!-- 실천 기록 추가 모달 -->
+      <HabitCommitModal
+        v-if="showCommitForm"
+        :habit-id="habitId"
+        :habit-title="habit?.title || ''"
+        :selected-date="selectedDate"
+        @close="closeCommitForm"
+        @saved="handleCommitSaved"
+      />
     </div>
-
-    <!-- 깃허브 잔디 스타일 뷰 -->
-    <HabitGithubGrassView 
-      v-if="viewMode === 'github'"
-      :habit-id="habitId"
-      :commits="commits"
-      @date-click="handleDateClick"
-    />
-
-    <!-- 실천 기록 추가 모달 -->
-    <HabitCommitModal
-      v-if="showCommitForm"
-      :habit-id="habitId"
-      :habit-title="habit?.title || ''"
-      :selected-date="selectedDate"
-      @close="closeCommitForm"
-      @saved="handleCommitSaved"
-    />
-
-    <!-- 뒤로가기 버튼 -->
-    <button class="back-btn" @click="$emit('close')">
-      ← 뒤로가기
-    </button>
   </div>
 </template>
 
@@ -81,6 +88,7 @@
 import { ref, onMounted, computed } from 'vue';
 import habitService, { type Habit, type HabitCommit } from '../services/habitService';
 import HabitGithubGrassView from './HabitGithubGrassView.vue';
+import HabitGrapeView from './HabitGrapeView.vue';
 import HabitCommitModal from './HabitCommitModal.vue';
 
 interface Props {
@@ -167,7 +175,15 @@ const closeCommitForm = () => {
 // 커밋 저장 완료
 const handleCommitSaved = async () => {
   console.log('Commit saved, reloading data...');
+  const previousCommitCount = commits.value.length;
+  
+  // 약간의 지연 후 데이터 새로고침 (데이터베이스 반영 대기)
+  await new Promise(resolve => setTimeout(resolve, 100));
   await loadHabitData(); // 데이터 새로고침
+  
+  const newCommitCount = commits.value.length;
+  console.log(`Commits count changed: ${previousCommitCount} -> ${newCommitCount}`);
+  console.log('New commits data:', commits.value);
   closeCommitForm();
 };
 
@@ -178,23 +194,42 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 10px;
+}
+
 .habit-dashboard {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
   background: white;
-  min-height: 100vh;
+  border-radius: 16px;
+  max-width: 1200px;
+  width: 95%;
+  max-height: 95vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  position: relative;
 }
 
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  padding: 20px;
+  padding: 24px 60px 24px 24px; /* 우측에 닫기 버튼 공간 확보 */
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+  gap: 20px; /* 요소 간 간격 추가 */
 }
 
 .habit-info {
@@ -258,8 +293,10 @@ onMounted(() => {
 
 .habit-stats {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   align-items: center;
+  flex-shrink: 0; /* 축소되지 않도록 */
+  min-width: 240px; /* 최소 폭 보장 */
 }
 
 .stat-item {
@@ -281,11 +318,39 @@ onMounted(() => {
   margin-top: 4px;
 }
 
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e5e7eb;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 6px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.close-btn:hover {
+  color: #1f2937;
+  background: white;
+  border-color: #d1d5db;
+  transform: scale(1.05);
+}
+
 .dashboard-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  padding: 0 24px;
 }
 
 .view-switcher {
@@ -338,31 +403,35 @@ onMounted(() => {
   box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
-.back-btn {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  background: white;
-  border: 1px solid #d1d5db;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  z-index: 100;
+/* HabitGithubGrassView에 패딩 추가 */
+:deep(.github-grass-view) {
+  margin: 0 24px 24px 24px;
+  border-radius: 8px;
 }
 
-.back-btn:hover {
-  background: #f9fafb;
-  transform: translateX(-2px);
+/* HabitGrapeView에 패딩 추가 */
+:deep(.grape-view) {
+  margin: 0 24px 24px 24px;
+  border-radius: 8px;
 }
 
 /* 반응형 */
 @media (max-width: 768px) {
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  
+  .habit-dashboard {
+    max-height: calc(100vh - 40px);
+    border-radius: 12px;
+  }
+  
   .dashboard-header {
     flex-direction: column;
     gap: 16px;
+    padding: 20px 50px 20px 20px; /* 모바일에서도 닫기 버튼 공간 확보 */
   }
   
   .habit-stats {
@@ -374,10 +443,21 @@ onMounted(() => {
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
+    padding: 0 20px;
   }
   
   .view-switcher {
     justify-content: center;
+  }
+  
+  :deep(.github-grass-view),
+  :deep(.grape-view) {
+    margin: 0 20px 20px 20px;
+  }
+  
+  .close-btn {
+    top: 15px;
+    right: 15px;
   }
 }
 </style>

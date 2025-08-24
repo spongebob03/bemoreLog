@@ -158,6 +158,7 @@ const saveCommit = async () => {
 
     await habitService.createHabitCommit(props.habitId, commitData);
     
+    console.log('HabitCommitModal - Commit saved successfully, emitting saved event');
     emit('saved');
   } catch (error) {
     console.error('Error saving habit commit:', error);
