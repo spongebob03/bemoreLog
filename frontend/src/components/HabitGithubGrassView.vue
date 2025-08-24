@@ -15,7 +15,7 @@
       </div>
     </div>
 
-    <div class="grass-container">
+    <div class="grass-container" :style="{ '--weeks-count': weeksCount }">
       <!-- 요일 라벨 -->
       <div class="weekday-labels">
         <div class="weekday-label"></div>
@@ -141,8 +141,10 @@ const days = computed(() => {
     commitsByDate.get(date)!.push(commit);
   });
 
-  // 53주 * 7일 = 371일 데이터 생성
-  for (let i = 0; i < 371; i++) {
+  // 현재 날짜까지 포함하도록 동적 계산
+  const daysToShow = Math.max(371, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  
+  for (let i = 0; i < daysToShow; i++) {
     const currentDate = new Date(startDate);
     currentDate.setDate(startDate.getDate() + i);
     
@@ -216,6 +218,18 @@ const monthLabels = computed((): MonthLabel[] => {
 // 총 실천 횟수
 const totalCommits = computed(() => {
   return props.commits.length;
+});
+
+// 표시할 주 수 계산
+const weeksCount = computed(() => {
+  const today = new Date();
+  const yearAgo = new Date(today);
+  yearAgo.setFullYear(today.getFullYear() - 1);
+  const startDate = new Date(yearAgo);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+  
+  const daysToShow = Math.max(371, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  return Math.ceil(daysToShow / 7);
 });
 
 // 날짜 클릭 핸들러
@@ -314,7 +328,7 @@ const formatDate = (dateString: string): string => {
 
 .month-labels {
   display: grid;
-  grid-template-columns: repeat(53, 15px);
+  grid-template-columns: repeat(var(--weeks-count, 53), 15px);
   gap: 3px;
   margin-left: 25px;
   margin-bottom: 8px;
@@ -330,7 +344,7 @@ const formatDate = (dateString: string): string => {
 .grass-grid {
   display: grid;
   grid-template-rows: repeat(7, 15px);
-  grid-template-columns: repeat(53, 15px);
+  grid-template-columns: repeat(var(--weeks-count, 53), 15px);
   gap: 3px;
   margin-left: 25px;
   grid-auto-flow: column;
@@ -405,6 +419,17 @@ const formatDate = (dateString: string): string => {
 }
 
 /* 반응형 */
+@media (max-width: 1100px) {
+  .grass-container {
+    padding: 15px 10px;
+    overflow-x: auto;
+  }
+  
+  .grass-grid {
+    min-width: 900px;
+  }
+}
+
 @media (max-width: 768px) {
   .grass-container {
     padding: 10px;
@@ -418,7 +443,7 @@ const formatDate = (dateString: string): string => {
   }
   
   .grass-grid {
-    min-width: 800px;
+    min-width: 850px;
   }
 }
 </style>
