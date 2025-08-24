@@ -23,6 +23,24 @@
           {{ epic.subs.length }}개 하위
         </span>
       </div>
+      
+      <!-- depth=2인 Epic에 트랙킹 버튼 추가 -->
+      <div v-if="epic.depth === 2" class="epic-actions">
+        <button 
+          class="habit-tracking-btn"
+          @click.stop="$emit('create-habit')"
+          title="습관 트랙킹 생성"
+        >
+          📊 트랙킹
+        </button>
+        <button 
+          class="habit-view-btn"
+          @click.stop="$emit('view-habit')"
+          title="습관 실천 현황 보기"
+        >
+          📈 현황
+        </button>
+      </div>
     </div>
     
     <div v-else class="empty-content">
@@ -44,6 +62,8 @@ interface Props {
 const props = defineProps<Props>();
 defineEmits<{
   click: [];
+  'create-habit': [];
+  'view-habit': [];
 }>();
 
 // 설명 텍스트 자르기
@@ -221,5 +241,66 @@ const getStatusText = (status: string): string => {
 .empty-text {
   font-size: 11px;
   margin: 0;
+}
+
+.epic-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.habit-tracking-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.habit-tracking-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.habit-tracking-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.habit-view-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.habit-view-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.habit-view-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.epic-card.is-compact .habit-tracking-btn,
+.epic-card.is-compact .habit-view-btn {
+  padding: 2px 6px;
+  font-size: 8px;
 }
 </style>
