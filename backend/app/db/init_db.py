@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from ..models.base import Base
 from .session import engine
 from ..models.epic import Epic  # Import all models here
+from ..models.habit import Habit, HabitCommit  # Import habit models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

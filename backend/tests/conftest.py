@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
-from app.db.models import Epic
+from app.models.epic import Epic
 
 # Test database URL
 TEST_SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
