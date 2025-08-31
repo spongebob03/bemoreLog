@@ -13,6 +13,7 @@
           :epic="getEpicAtPosition(index)"
           :position="getRelativePosition(index).toString()"
           @click="handleEpicClick(getEpicAtPosition(index))"
+
         />
         <div v-else class="position-label">
           [{{getRelativePosition(index)}}]
@@ -32,6 +33,10 @@ interface Props {
   epics: Epic[];
   onCellClick: (relativePosition: string, epic: Epic | null) => void;
 }
+
+const emit = defineEmits<{
+  'epic-click': [epic: Epic];
+}>();
 
 const props = defineProps<Props>();
 
@@ -123,7 +128,8 @@ const handleCellClick = (index: number) => {
 // Epic 클릭 핸들러
 const handleEpicClick = (epic: Epic | null) => {
   if (epic) {
-    console.log('Epic clicked:', epic.title);
+    emit('epic-click', epic);
+    props.onCellClick(epic.position?.toString() || '0', epic);
   }
 };
 </script>

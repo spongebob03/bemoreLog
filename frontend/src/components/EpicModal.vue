@@ -12,12 +12,21 @@
           <p class="detail-desc" v-if="epic.description">{{ epic.description }}</p>
           <div class="detail-meta">
             <span class="badge">상태: {{ statusText }}</span>
-            <span class="meta">깊이: {{ epic.depth }}</span>
-            <span class="meta" v-if="epic.position">위치: {{ epic.position }}</span>
-            <span class="meta">하위: {{ epic.subs?.length || 0 }}</span>
+            <span class="meta depth-info" :class="`depth-${epic.depth}`">
+              {{ getDepthDescription(epic.depth) }}
+            </span>
+            <!-- <span class="meta" v-if="epic.position">위치: {{ epic.position }}</span>
+            <span class="meta">하위: {{ epic.subs?.length || 0 }}</span> -->
           </div>
         </div>
         <div class="modal-actions">
+          <button 
+            v-if="epic.depth === 2"
+            class="btn-create-habit" 
+            @click="showCreateHabitModal = true"
+          >
+            📊 트랙킹 생성
+          </button>
           <button class="btn-primary" @click="switchToEdit">수정하기</button>
           <button 
             class="btn-danger" 
@@ -27,6 +36,86 @@
             삭제하기
           </button>
           <button class="btn-secondary" @click="handleClose">닫기</button>
+        </div>
+
+        <!-- 연결된 습관 현황 섹션 (depth=2인 Epic에만 표시) -->
+        <div v-if="epic.depth === 2 && latestHabit" class="habit-section">
+          <div class="habit-section-header">
+            <h4>연결된 최신 습관</h4>
+            <button 
+              class="btn-habit-toggle"
+              @click="showHabitDetail = !showHabitDetail"
+            >
+              <span class="toggle-icon">{{ showHabitDetail ? '🔼' : '🔽' }}</span>
+              {{ showHabitDetail ? '상세 현황 숨기기' : '상세 현황 펼치기' }}
+            </button>
+          </div>
+          
+          <div class="habit-preview">
+            <div class="habit-info">
+              <h5>{{ latestHabit.title }}</h5>
+              <p v-if="latestHabit.description">{{ latestHabit.description }}</p>
+            </div>
+            <div class="habit-quick-stats">
+              <div class="quick-stat">
+                <span class="quick-stat-value">{{ latestHabit.current_combo }}</span>
+                <span class="quick-stat-label">현재 연속</span>
+              </div>
+              <div class="quick-stat">
+                <span class="quick-stat-value">{{ latestHabit.best_combo }}</span>
+                <span class="quick-stat-label">최고 연속</span>
+              </div>
+              <div class="quick-stat">
+                <span class="quick-stat-value">{{ latestHabit.total_completions }}</span>
+                <span class="quick-stat-label">총 실천</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 펼쳐지는 상세 현황 -->
+          <div v-if="showHabitDetail" class="habit-detail-expanded">
+            <div class="habit-controls">
+              <div class="view-switcher">
+                <button 
+                  class="switch-btn"
+                  :class="{ active: habitViewMode === 'github' }"
+                  @click="habitViewMode = 'github'"
+                >
+                  🟩 잔디 뷰
+                </button>
+                <button 
+                  class="switch-btn"
+                  :class="{ active: habitViewMode === 'grape' }"
+                  @click="habitViewMode = 'grape'"
+                >
+                  🍇 포도송이 뷰
+                </button>
+              </div>
+              
+              <button class="add-commit-btn" @click="showCommitModal = true">
+                ➕ 실천 기록
+              </button>
+            </div>
+
+            <!-- 시각화 컴포넌트 -->
+            <div class="habit-visualization">
+              <!-- 깃허브 잔디 스타일 뷰 -->
+              <HabitGithubGrassView 
+                v-if="habitViewMode === 'github'"
+                :habit-id="latestHabit.id"
+                :commits="habitCommits"
+                @date-click="handleDateClick"
+              />
+
+              <!-- 포도송이 스타일 뷰 -->
+              <HabitGrapeView 
+                v-if="habitViewMode === 'grape'"
+                :habit-id="latestHabit.id"
+                :commits="habitCommits"
+                @date-click="handleDateClick"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -73,15 +162,37 @@
         />
       </section>
 
+      <!-- 실천 기록 추가 모달 -->
+      <HabitCommitModal
+        v-if="showCommitModal && latestHabit"
+        :habit-id="latestHabit.id"
+        :habit-title="latestHabit.title"
+        :selected-date="selectedDate"
+        @close="closeCommitModal"
+        @saved="handleCommitSaved"
+      />
 
+      <!-- 습관 생성 모달 (depth=2인 Epic만) -->
+      <HabitCreateModal
+        v-if="showCreateHabitModal && epic && epic.depth === 2"
+        :epic-id="epic.id"
+        :epic-title="epic.title"
+        @close="closeCreateHabitModal"
+        @created="handleHabitCreated"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EpicForm from './EpicForm.vue';
+import HabitGithubGrassView from './HabitGithubGrassView.vue';
+import HabitGrapeView from './HabitGrapeView.vue';
+import HabitCommitModal from './HabitCommitModal.vue';
+import HabitCreateModal from './HabitCreateModal.vue';
 import epicService from '../services/epicService';
+import habitService, { type Habit, type HabitCommit } from '../services/habitService';
 import type { Epic } from '../services/epicService';
 
 interface Props {
@@ -108,9 +219,62 @@ const isEditMode = ref(false);
 const showDeleteDialog = ref(false);
 const isDeleting = ref(false);
 
+// Habit 관련 상태
+const latestHabit = ref<Habit | null>(null);
+const habitCommits = ref<HabitCommit[]>([]);
+const showHabitDetail = ref(false);
+const habitViewMode = ref<'github' | 'grape'>('github');
+const showCommitModal = ref(false);
+const selectedDate = ref<string | null>(null);
+const showCreateHabitModal = ref(false);
+
 const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
 };
+
+// 최신 습관과 커밋 데이터 로드 (depth=2인 Epic만)
+const loadLatestHabit = async () => {
+  if (!props.epic?.id || props.epic.depth !== 2) {
+    latestHabit.value = null;
+    habitCommits.value = [];
+    return;
+  }
+
+  try {
+    const habits = await habitService.getHabits(props.epic.id);
+    if (habits.length > 0) {
+      // 가장 최근에 생성된 습관 또는 가장 최근에 업데이트된 습관 선택
+      const sortedHabits = habits.sort((a, b) => {
+        const dateA = new Date(a.updated_at || a.created_at);
+        const dateB = new Date(b.updated_at || b.created_at);
+        return dateB.getTime() - dateA.getTime();
+      });
+      latestHabit.value = sortedHabits[0];
+      
+      // 선택된 습관의 커밋 데이터 로드
+      if (latestHabit.value) {
+        const commits = await habitService.getHabitCommits(latestHabit.value.id, 365);
+        habitCommits.value = commits;
+      }
+    } else {
+      latestHabit.value = null;
+      habitCommits.value = [];
+    }
+  } catch (error) {
+    console.error('Error loading latest habit:', error);
+    latestHabit.value = null;
+    habitCommits.value = [];
+  }
+};
+
+// Epic이 변경될 때마다 습관 다시 로드
+watch(() => props.epic?.id, (newEpicId) => {
+  if (newEpicId) {
+    loadLatestHabit();
+  } else {
+    latestHabit.value = null;
+  }
+}, { immediate: true });
 
 onMounted(() => {
   checkIsMobile();
@@ -146,6 +310,16 @@ const statusText = computed(() => {
   };
   return statusMap[props.epic.status] || props.epic.status;
 });
+
+// Depth 설명 함수
+const getDepthDescription = (depth: number): string => {
+  const depthMap: Record<number, string> = {
+    0: '코어 목표',
+    1: '세부 목표',
+    2: '실행 목표 - 트랙킹 가능',
+  };
+  return depthMap[depth] || '';
+};
 
 // 하위 epic이 있는지 안전하게 확인
 const hasSubEpics = computed(() => {
@@ -193,11 +367,39 @@ const confirmDelete = async () => {
   }
 };
 
+// Habit 관련 이벤트 핸들러
+const handleDateClick = (date: string) => {
+  selectedDate.value = date;
+  showCommitModal.value = true;
+};
+
+const closeCommitModal = () => {
+  showCommitModal.value = false;
+  selectedDate.value = null;
+};
+
+const handleCommitSaved = async () => {
+  closeCommitModal();
+  // 데이터 새로고침
+  await loadLatestHabit();
+};
+
+const closeCreateHabitModal = () => {
+  showCreateHabitModal.value = false;
+};
+
+const handleHabitCreated = async () => {
+  closeCreateHabitModal();
+  // 새로 생성된 습관 데이터 새로고침
+  await loadLatestHabit();
+};
+
 // 모달 닫기 시 body overflow 복원
 const handleClose = () => {
   document.body.style.overflow = '';
   isEditMode.value = false; // edit 모드 초기화
   showDeleteDialog.value = false; // 삭제 다이얼로그도 닫기
+  showHabitDetail.value = false; // habit 상세도 초기화
   emit('close');
 };
 </script>
@@ -216,7 +418,7 @@ const handleClose = () => {
 
 .modal-panel {
   width: 100%;
-  max-width: 720px;
+  max-width: 1200px; /* HabitDashboard와 동일한 폭 */
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -298,21 +500,49 @@ const handleClose = () => {
   font-size: 12px;
 }
 
+.depth-info {
+  font-weight: 500;
+}
+
+.depth-0 {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.depth-1 {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.depth-2 {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+  flex-wrap: wrap;
 }
 
 .btn-primary,
 .btn-secondary,
-.btn-danger {
+.btn-danger,
+.btn-create-habit {
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-primary {
@@ -329,6 +559,18 @@ const handleClose = () => {
 .btn-danger {
   background: #ef4444;
   color: #ffffff;
+}
+
+.btn-create-habit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.btn-create-habit:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 .btn-danger:hover {
@@ -399,9 +641,267 @@ const handleClose = () => {
   flex: 1;
 }
 
+/* 습관 안내 섹션 스타일 */
+.habit-info-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border: 1px solid #94a3b8;
+}
+
+.info-content h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.info-content p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.info-content strong {
+  color: #059669;
+  font-weight: 600;
+}
+
+/* 습관 섹션 스타일 */
+.habit-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+  border-radius: 12px;
+  border: 1px solid #f59e0b;
+}
+
+.habit-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.habit-section-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.btn-habit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.btn-habit-toggle:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.btn-habit-toggle:hover .toggle-icon {
+  transform: scale(1.2);
+}
+
+.habit-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.habit-info {
+  flex: 1;
+}
+
+.habit-info h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.habit-info p {
+  margin: 0;
+  font-size: 12px;
+  color: #a16207;
+  line-height: 1.4;
+}
+
+.habit-quick-stats {
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.quick-stat {
+  text-align: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  min-width: 60px;
+}
+
+.quick-stat-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #92400e;
+  line-height: 1;
+}
+
+.quick-stat-label {
+  display: block;
+  font-size: 10px;
+  color: #a16207;
+  margin-top: 4px;
+}
+
+/* 펼쳐지는 상세 현황 스타일 */
+.habit-detail-expanded {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(245, 158, 11, 0.3);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.habit-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.view-switcher {
+  display: flex;
+  gap: 8px;
+}
+
+.switch-btn {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.switch-btn:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.switch-btn.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.add-commit-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.add-commit-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.habit-visualization {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 1024px) {
+  .modal-panel {
+    max-width: 95%;
+  }
+}
+
 @media (max-width: 640px) {
+  .modal-panel {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  
   .modal-actions {
     flex-direction: column;
+  }
+  
+  .habit-preview {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .habit-quick-stats {
+    justify-content: center;
+    gap: 12px;
+  }
+  
+  .habit-section-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .habit-controls {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .view-switcher {
+    justify-content: center;
   }
 }
 </style>

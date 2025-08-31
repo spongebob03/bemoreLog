@@ -13,6 +13,8 @@
         :grid-index="gridIndex - 1"
         :epics="gridEpics[gridIndex - 1]"
         :on-cell-click="(relativePosition, epic) => handleCellClick(relativePosition, epic, gridIndex - 1)"
+        @create-habit="handleCreateHabit"
+        @view-habit="handleViewHabit"
       />
     </div>
 
@@ -30,6 +32,22 @@
       @epic-deleted="handleEpicDeleted"
     />
 
+    <!-- Habit Create Modal -->
+    <HabitCreateModal
+      v-if="showHabitCreateModal && selectedEpicForHabit"
+      :epic-id="selectedEpicForHabit.id"
+      :epic-title="selectedEpicForHabit.title"
+      @close="closeHabitModal"
+      @created="handleHabitCreated"
+    />
+
+    <!-- Habit Dashboard -->
+    <HabitDashboard
+      v-if="showHabitDashboard && selectedHabitId"
+      :habit-id="selectedHabitId"
+      @close="closeHabitDashboard"
+    />
+
     <!-- Floating Action Button -->
     <div class="fab" @click="showCreateModal = true">
       <span class="fab-icon">+</span>
@@ -45,6 +63,9 @@ import { ref, onMounted, computed } from 'vue';
 import epicService, { type Epic } from '../services/epicService';
 import EpicModal from './EpicModal.vue';
 import ThreeByThreeGrid from './ThreeByThreeGrid.vue';
+import HabitCreateModal from './HabitCreateModal.vue';
+import HabitDashboard from './HabitDashboard.vue';
+import habitService from '../services/habitService';
 
 const epics = ref<Epic[]>([]);
 const loading = ref(false);
@@ -52,6 +73,12 @@ const selectedEpic = ref<Epic | null>(null);
 const showCreateModal = ref(false);
 const selectedPosition = ref<{row: number, col: number} | null>(null);
 const selectedGridIndex = ref<number | undefined>(undefined);
+
+// Habit 관련 상태
+const showHabitCreateModal = ref(false);
+const selectedEpicForHabit = ref<Epic | null>(null);
+const showHabitDashboard = ref(false);
+const selectedHabitId = ref<number | null>(null);
 
 // 3x3 그리드별로 epic을 분류하는 computed 속성
 const gridEpics = computed(() => {
@@ -271,6 +298,50 @@ const handleClearAllEpics = async () => {
       alert('Epic 삭제에 실패했습니다.');
     }
   }
+};
+
+// Habit 생성 핸들러
+const handleCreateHabit = (epic: Epic) => {
+  console.log('Creating habit for epic:', epic.title);
+  selectedEpicForHabit.value = epic;
+  showHabitCreateModal.value = true;
+};
+
+// Habit 모달 닫기
+const closeHabitModal = () => {
+  showHabitCreateModal.value = false;
+  selectedEpicForHabit.value = null;
+};
+
+// Habit 생성 완료
+const handleHabitCreated = (habit: any) => {
+  console.log('Habit created successfully:', habit);
+  closeHabitModal();
+  // TODO: 필요하다면 습관 목록을 별도로 관리하고 업데이트
+};
+
+// Habit 보기 핸들러
+const handleViewHabit = async (epic: Epic) => {
+  console.log('Viewing habit for epic:', epic.title);
+  try {
+    // Epic에 연결된 습관 조회
+    const habits = await habitService.getHabits(epic.id);
+    if (habits.length > 0) {
+      selectedHabitId.value = habits[0].id; // 첫 번째 습관 선택
+      showHabitDashboard.value = true;
+    } else {
+      alert('이 Epic에 연결된 습관이 없습니다. 먼저 트랙킹을 생성해주세요.');
+    }
+  } catch (error) {
+    console.error('Error fetching habits:', error);
+    alert('습관 정보를 불러오는데 실패했습니다.');
+  }
+};
+
+// Habit 대시보드 닫기
+const closeHabitDashboard = () => {
+  showHabitDashboard.value = false;
+  selectedHabitId.value = null;
 };
 
 // 컴포넌트 마운트 시 Epic 데이터 로드
