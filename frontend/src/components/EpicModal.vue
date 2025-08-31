@@ -18,6 +18,9 @@
           </div>
         </div>
         <div class="modal-actions">
+          <button class="btn-create-habit" @click="showCreateHabitModal = true">
+            📊 트랙킹 생성
+          </button>
           <button class="btn-primary" @click="switchToEdit">수정하기</button>
           <button 
             class="btn-danger" 
@@ -162,6 +165,15 @@
         @close="closeCommitModal"
         @saved="handleCommitSaved"
       />
+
+      <!-- 습관 생성 모달 -->
+      <HabitCreateModal
+        v-if="showCreateHabitModal && epic"
+        :epic-id="epic.id"
+        :epic-title="epic.title"
+        @close="closeCreateHabitModal"
+        @created="handleHabitCreated"
+      />
     </div>
   </div>
 </template>
@@ -172,6 +184,7 @@ import EpicForm from './EpicForm.vue';
 import HabitGithubGrassView from './HabitGithubGrassView.vue';
 import HabitGrapeView from './HabitGrapeView.vue';
 import HabitCommitModal from './HabitCommitModal.vue';
+import HabitCreateModal from './HabitCreateModal.vue';
 import epicService from '../services/epicService';
 import habitService, { type Habit, type HabitCommit } from '../services/habitService';
 import type { Epic } from '../services/epicService';
@@ -207,6 +220,7 @@ const showHabitDetail = ref(false);
 const habitViewMode = ref<'github' | 'grape'>('github');
 const showCommitModal = ref(false);
 const selectedDate = ref<string | null>(null);
+const showCreateHabitModal = ref(false);
 
 const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
@@ -354,6 +368,16 @@ const handleCommitSaved = async () => {
   await loadLatestHabit();
 };
 
+const closeCreateHabitModal = () => {
+  showCreateHabitModal.value = false;
+};
+
+const handleHabitCreated = async () => {
+  closeCreateHabitModal();
+  // 새로 생성된 습관 데이터 새로고침
+  await loadLatestHabit();
+};
+
 // 모달 닫기 시 body overflow 복원
 const handleClose = () => {
   document.body.style.overflow = '';
@@ -464,17 +488,20 @@ const handleClose = () => {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+  flex-wrap: wrap;
 }
 
 .btn-primary,
 .btn-secondary,
-.btn-danger {
+.btn-danger,
+.btn-create-habit {
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-primary {
@@ -491,6 +518,18 @@ const handleClose = () => {
 .btn-danger {
   background: #ef4444;
   color: #ffffff;
+}
+
+.btn-create-habit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.btn-create-habit:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 .btn-danger:hover {

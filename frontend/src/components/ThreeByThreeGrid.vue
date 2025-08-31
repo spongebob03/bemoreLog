@@ -13,8 +13,7 @@
           :epic="getEpicAtPosition(index)"
           :position="getRelativePosition(index).toString()"
           @click="handleEpicClick(getEpicAtPosition(index))"
-          @create-habit="handleCreateHabit(getEpicAtPosition(index))"
-          @view-habit="handleViewHabit(getEpicAtPosition(index))"
+
         />
         <div v-else class="position-label">
           [{{getRelativePosition(index)}}]
@@ -36,8 +35,7 @@ interface Props {
 }
 
 const emit = defineEmits<{
-  'create-habit': [epic: Epic];
-  'view-habit': [epic: Epic];
+  'epic-click': [epic: Epic];
 }>();
 
 const props = defineProps<Props>();
@@ -130,23 +128,8 @@ const handleCellClick = (index: number) => {
 // Epic 클릭 핸들러
 const handleEpicClick = (epic: Epic | null) => {
   if (epic) {
-    console.log('Epic clicked:', epic.title);
-  }
-};
-
-// Habit 생성 핸들러
-const handleCreateHabit = (epic: Epic | null) => {
-  if (epic && epic.depth === 2) {
-    console.log('Creating habit for epic:', epic.title);
-    emit('create-habit', epic);
-  }
-};
-
-// Habit 보기 핸들러
-const handleViewHabit = (epic: Epic | null) => {
-  if (epic && epic.depth === 2) {
-    console.log('Viewing habit for epic:', epic.title);
-    emit('view-habit', epic);
+    emit('epic-click', epic);
+    props.onCellClick(epic.position?.toString() || '0', epic);
   }
 };
 </script>
