@@ -15,14 +15,6 @@
       <p v-if="epic.description" class="epic-description">
         {{ truncateDescription(epic.description, getMaxLength()) }}
       </p>
-      <div class="epic-meta">
-        <span class="epic-status" :class="`status-${epic.status}`">
-          {{ getStatusText(epic.status) }}
-        </span>
-        <span v-if="epic.subs && epic.subs.length > 0" class="epic-subs-count">
-          {{ epic.subs.length }}개 하위
-        </span>
-      </div>
       
 
     </div>
@@ -59,16 +51,6 @@ const getMaxLength = (): number => {
   return props.isCompact ? 30 : 50;
 };
 
-// 상태 텍스트 변환
-const getStatusText = (status: string): string => {
-  const statusMap: Record<string, string> = {
-    'todo': '할 일',
-    'running': '진행 중',
-    'done': '완료',
-    'blocked': '차단됨'
-  };
-  return statusMap[status] || status;
-};
 </script>
 
 <style scoped>

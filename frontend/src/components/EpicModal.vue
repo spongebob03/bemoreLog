@@ -12,13 +12,19 @@
           <p class="detail-desc" v-if="epic.description">{{ epic.description }}</p>
           <div class="detail-meta">
             <span class="badge">상태: {{ statusText }}</span>
-            <span class="meta">깊이: {{ epic.depth }}</span>
-            <span class="meta" v-if="epic.position">위치: {{ epic.position }}</span>
-            <span class="meta">하위: {{ epic.subs?.length || 0 }}</span>
+            <span class="meta depth-info" :class="`depth-${epic.depth}`">
+              {{ getDepthDescription(epic.depth) }}
+            </span>
+            <!-- <span class="meta" v-if="epic.position">위치: {{ epic.position }}</span>
+            <span class="meta">하위: {{ epic.subs?.length || 0 }}</span> -->
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn-create-habit" @click="showCreateHabitModal = true">
+          <button 
+            v-if="epic.depth === 2"
+            class="btn-create-habit" 
+            @click="showCreateHabitModal = true"
+          >
             📊 트랙킹 생성
           </button>
           <button class="btn-primary" @click="switchToEdit">수정하기</button>
@@ -32,8 +38,8 @@
           <button class="btn-secondary" @click="handleClose">닫기</button>
         </div>
 
-        <!-- 연결된 습관 현황 섹션 -->
-        <div v-if="latestHabit" class="habit-section">
+        <!-- 연결된 습관 현황 섹션 (depth=2인 Epic에만 표시) -->
+        <div v-if="epic.depth === 2 && latestHabit" class="habit-section">
           <div class="habit-section-header">
             <h4>연결된 최신 습관</h4>
             <button 
@@ -166,9 +172,9 @@
         @saved="handleCommitSaved"
       />
 
-      <!-- 습관 생성 모달 -->
+      <!-- 습관 생성 모달 (depth=2인 Epic만) -->
       <HabitCreateModal
-        v-if="showCreateHabitModal && epic"
+        v-if="showCreateHabitModal && epic && epic.depth === 2"
         :epic-id="epic.id"
         :epic-title="epic.title"
         @close="closeCreateHabitModal"
@@ -226,9 +232,9 @@ const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
 };
 
-// 최신 습관과 커밋 데이터 로드
+// 최신 습관과 커밋 데이터 로드 (depth=2인 Epic만)
 const loadLatestHabit = async () => {
-  if (!props.epic?.id) {
+  if (!props.epic?.id || props.epic.depth !== 2) {
     latestHabit.value = null;
     habitCommits.value = [];
     return;
@@ -304,6 +310,16 @@ const statusText = computed(() => {
   };
   return statusMap[props.epic.status] || props.epic.status;
 });
+
+// Depth 설명 함수
+const getDepthDescription = (depth: number): string => {
+  const depthMap: Record<number, string> = {
+    0: '코어 목표',
+    1: '세부 목표',
+    2: '실행 목표 - 트랙킹 가능',
+  };
+  return depthMap[depth] || '';
+};
 
 // 하위 epic이 있는지 안전하게 확인
 const hasSubEpics = computed(() => {
@@ -484,6 +500,31 @@ const handleClose = () => {
   font-size: 12px;
 }
 
+.depth-info {
+  font-weight: 500;
+}
+
+.depth-0 {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.depth-1 {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.depth-2 {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
@@ -598,6 +639,34 @@ const handleClose = () => {
 
 .delete-confirm-actions .btn-secondary {
   flex: 1;
+}
+
+/* 습관 안내 섹션 스타일 */
+.habit-info-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border: 1px solid #94a3b8;
+}
+
+.info-content h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.info-content p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.info-content strong {
+  color: #059669;
+  font-weight: 600;
 }
 
 /* 습관 섹션 스타일 */
