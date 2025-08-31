@@ -34,12 +34,14 @@
           <div class="habit-section-header">
             <h4>연결된 최신 습관</h4>
             <button 
-              class="btn-habit-dashboard"
-              @click="showHabitDashboard = true"
+              class="btn-habit-toggle"
+              @click="showHabitDetail = !showHabitDetail"
             >
-              📊 상세 현황 보기
+              <span class="toggle-icon">{{ showHabitDetail ? '🔼' : '🔽' }}</span>
+              {{ showHabitDetail ? '상세 현황 숨기기' : '상세 현황 펼치기' }}
             </button>
           </div>
+          
           <div class="habit-preview">
             <div class="habit-info">
               <h5>{{ latestHabit.title }}</h5>
@@ -58,6 +60,51 @@
                 <span class="quick-stat-value">{{ latestHabit.total_completions }}</span>
                 <span class="quick-stat-label">총 실천</span>
               </div>
+            </div>
+          </div>
+
+          <!-- 펼쳐지는 상세 현황 -->
+          <div v-if="showHabitDetail" class="habit-detail-expanded">
+            <div class="habit-controls">
+              <div class="view-switcher">
+                <button 
+                  class="switch-btn"
+                  :class="{ active: habitViewMode === 'github' }"
+                  @click="habitViewMode = 'github'"
+                >
+                  🟩 잔디 뷰
+                </button>
+                <button 
+                  class="switch-btn"
+                  :class="{ active: habitViewMode === 'grape' }"
+                  @click="habitViewMode = 'grape'"
+                >
+                  🍇 포도송이 뷰
+                </button>
+              </div>
+              
+              <button class="add-commit-btn" @click="showCommitModal = true">
+                ➕ 실천 기록
+              </button>
+            </div>
+
+            <!-- 시각화 컴포넌트 -->
+            <div class="habit-visualization">
+              <!-- 깃허브 잔디 스타일 뷰 -->
+              <HabitGithubGrassView 
+                v-if="habitViewMode === 'github'"
+                :habit-id="latestHabit.id"
+                :commits="habitCommits"
+                @date-click="handleDateClick"
+              />
+
+              <!-- 포도송이 스타일 뷰 -->
+              <HabitGrapeView 
+                v-if="habitViewMode === 'grape'"
+                :habit-id="latestHabit.id"
+                :commits="habitCommits"
+                @date-click="handleDateClick"
+              />
             </div>
           </div>
         </div>
@@ -106,11 +153,14 @@
         />
       </section>
 
-      <!-- HabitDashboard 모달 -->
-      <HabitDashboard
-        v-if="showHabitDashboard && latestHabit"
-        :habitId="latestHabit.id"
-        @close="showHabitDashboard = false"
+      <!-- 실천 기록 추가 모달 -->
+      <HabitCommitModal
+        v-if="showCommitModal && latestHabit"
+        :habit-id="latestHabit.id"
+        :habit-title="latestHabit.title"
+        :selected-date="selectedDate"
+        @close="closeCommitModal"
+        @saved="handleCommitSaved"
       />
     </div>
   </div>
@@ -119,9 +169,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EpicForm from './EpicForm.vue';
-import HabitDashboard from './HabitDashboard.vue';
+import HabitGithubGrassView from './HabitGithubGrassView.vue';
+import HabitGrapeView from './HabitGrapeView.vue';
+import HabitCommitModal from './HabitCommitModal.vue';
 import epicService from '../services/epicService';
-import habitService, { type Habit } from '../services/habitService';
+import habitService, { type Habit, type HabitCommit } from '../services/habitService';
 import type { Epic } from '../services/epicService';
 
 interface Props {
@@ -150,16 +202,21 @@ const isDeleting = ref(false);
 
 // Habit 관련 상태
 const latestHabit = ref<Habit | null>(null);
-const showHabitDashboard = ref(false);
+const habitCommits = ref<HabitCommit[]>([]);
+const showHabitDetail = ref(false);
+const habitViewMode = ref<'github' | 'grape'>('github');
+const showCommitModal = ref(false);
+const selectedDate = ref<string | null>(null);
 
 const checkIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 640px)').matches;
 };
 
-// 최신 습관 로드
+// 최신 습관과 커밋 데이터 로드
 const loadLatestHabit = async () => {
   if (!props.epic?.id) {
     latestHabit.value = null;
+    habitCommits.value = [];
     return;
   }
 
@@ -173,12 +230,20 @@ const loadLatestHabit = async () => {
         return dateB.getTime() - dateA.getTime();
       });
       latestHabit.value = sortedHabits[0];
+      
+      // 선택된 습관의 커밋 데이터 로드
+      if (latestHabit.value) {
+        const commits = await habitService.getHabitCommits(latestHabit.value.id, 365);
+        habitCommits.value = commits;
+      }
     } else {
       latestHabit.value = null;
+      habitCommits.value = [];
     }
   } catch (error) {
     console.error('Error loading latest habit:', error);
     latestHabit.value = null;
+    habitCommits.value = [];
   }
 };
 
@@ -272,11 +337,29 @@ const confirmDelete = async () => {
   }
 };
 
+// Habit 관련 이벤트 핸들러
+const handleDateClick = (date: string) => {
+  selectedDate.value = date;
+  showCommitModal.value = true;
+};
+
+const closeCommitModal = () => {
+  showCommitModal.value = false;
+  selectedDate.value = null;
+};
+
+const handleCommitSaved = async () => {
+  closeCommitModal();
+  // 데이터 새로고침
+  await loadLatestHabit();
+};
+
 // 모달 닫기 시 body overflow 복원
 const handleClose = () => {
   document.body.style.overflow = '';
   isEditMode.value = false; // edit 모드 초기화
   showDeleteDialog.value = false; // 삭제 다이얼로그도 닫기
+  showHabitDetail.value = false; // habit 상세도 초기화
   emit('close');
 };
 </script>
@@ -295,7 +378,7 @@ const handleClose = () => {
 
 .modal-panel {
   width: 100%;
-  max-width: 720px;
+  max-width: 1200px; /* HabitDashboard와 동일한 폭 */
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -501,22 +584,36 @@ const handleClose = () => {
   color: #92400e;
 }
 
-.btn-habit-dashboard {
-  padding: 8px 16px;
+.btn-habit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
-.btn-habit-dashboard:hover {
+.btn-habit-toggle:hover {
   background: linear-gradient(135deg, #2563eb, #1e40af);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.btn-habit-toggle:hover .toggle-icon {
+  transform: scale(1.2);
 }
 
 .habit-preview {
@@ -573,7 +670,102 @@ const handleClose = () => {
   margin-top: 4px;
 }
 
+/* 펼쳐지는 상세 현황 스타일 */
+.habit-detail-expanded {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(245, 158, 11, 0.3);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.habit-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.view-switcher {
+  display: flex;
+  gap: 8px;
+}
+
+.switch-btn {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.switch-btn:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.switch-btn.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.add-commit-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.add-commit-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.habit-visualization {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 1024px) {
+  .modal-panel {
+    max-width: 95%;
+  }
+}
+
 @media (max-width: 640px) {
+  .modal-panel {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  
   .modal-actions {
     flex-direction: column;
   }
@@ -592,6 +784,16 @@ const handleClose = () => {
     flex-direction: column;
     gap: 8px;
     align-items: stretch;
+  }
+  
+  .habit-controls {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .view-switcher {
+    justify-content: center;
   }
 }
 </style>
