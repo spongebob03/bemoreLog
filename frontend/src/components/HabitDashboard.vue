@@ -12,7 +12,7 @@
             <span class="habit-status" :class="`status-${habit?.status}`">
               {{ getStatusText(habit?.status) }}
             </span>
-            <span class="habit-schedule">{{ formatSchedule(habit?.schedule) }}</span>
+            <span class="habit-schedule">{{ formatSchedule(habit?.schedule || undefined) }}</span>
           </div>
         </div>
         
