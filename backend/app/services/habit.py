@@ -9,6 +9,7 @@ from ..models.habit import (
     HabitUpdate, 
     HabitResponse,
     HabitCommitCreate,
+    HabitCommitUpdate,
     HabitCommitResponse,
     HabitStatus,
     to_habit_response
@@ -153,6 +154,60 @@ class HabitService:
             )
             for commit in commits
         ]
+
+    def update_habit_commit(self, commit_id: int, commit_data: HabitCommitUpdate) -> Optional[HabitCommitResponse]:
+        """습관 실천 기록 수정"""
+        commit = self.db.query(HabitCommit).filter(HabitCommit.id == commit_id).first()
+        if not commit:
+            return None
+
+        update_data = commit_data.dict(exclude_unset=True)
+        
+        for field, value in update_data.items():
+            if hasattr(commit, field):
+                setattr(commit, field, value)
+
+        self.db.commit()
+        self.db.refresh(commit)
+        
+        return HabitCommitResponse(
+            id=commit.id,
+            habit_id=commit.habit_id,
+            description=commit.description,
+            effort=commit.effort,
+            created_at=commit.created_at,
+            updated_at=commit.updated_at
+        )
+
+    def delete_habit_commit(self, commit_id: int) -> bool:
+        """습관 실천 기록 삭제"""
+        commit = self.db.query(HabitCommit).filter(HabitCommit.id == commit_id).first()
+        if not commit:
+            return False
+
+        # 습관 통계 업데이트 (total_completions 감소)
+        habit = self.db.query(Habit).filter(Habit.id == commit.habit_id).first()
+        if habit and habit.total_completions > 0:
+            habit.total_completions -= 1
+        
+        self.db.delete(commit)
+        self.db.commit()
+        return True
+
+    def get_habit_commit(self, commit_id: int) -> Optional[HabitCommitResponse]:
+        """특정 습관 실천 기록 조회"""
+        commit = self.db.query(HabitCommit).filter(HabitCommit.id == commit_id).first()
+        if not commit:
+            return None
+        
+        return HabitCommitResponse(
+            id=commit.id,
+            habit_id=commit.habit_id,
+            description=commit.description,
+            effort=commit.effort,
+            created_at=commit.created_at,
+            updated_at=commit.updated_at
+        )
 
     def update_habit_combo(self, habit_id: int):
         """습관의 연속 달성 일수 업데이트 (별도로 호출하거나 스케줄러에서 사용)"""

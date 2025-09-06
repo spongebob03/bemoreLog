@@ -8,6 +8,7 @@ from ..models.habit import (
     HabitUpdate, 
     HabitResponse,
     HabitCommitCreate,
+    HabitCommitUpdate,
     HabitCommitResponse,
     HabitStatus
 )
@@ -123,3 +124,40 @@ async def update_habit_status(
     if not updated_habit:
         raise HTTPException(status_code=404, detail="Habit not found")
     return updated_habit
+
+@router.get("/commit/{commit_id}", response_model=HabitCommitResponse)
+async def get_habit_commit(
+    commit_id: int,
+    db: Session = Depends(get_db)
+):
+    """특정 습관 실천 기록 조회"""
+    controller = HabitController(db)
+    commit = controller.service.get_habit_commit(commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Habit commit not found")
+    return commit
+
+@router.put("/commit/{commit_id}", response_model=HabitCommitResponse)
+async def update_habit_commit(
+    commit_id: int,
+    commit: HabitCommitUpdate,
+    db: Session = Depends(get_db)
+):
+    """습관 실천 기록 수정"""
+    controller = HabitController(db)
+    updated_commit = controller.service.update_habit_commit(commit_id, commit)
+    if not updated_commit:
+        raise HTTPException(status_code=404, detail="Habit commit not found")
+    return updated_commit
+
+@router.delete("/commit/{commit_id}")
+async def delete_habit_commit(
+    commit_id: int,
+    db: Session = Depends(get_db)
+):
+    """습관 실천 기록 삭제"""
+    controller = HabitController(db)
+    success = controller.service.delete_habit_commit(commit_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Habit commit not found")
+    return {"message": "Habit commit deleted successfully"}
