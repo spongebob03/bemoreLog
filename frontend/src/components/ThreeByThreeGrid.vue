@@ -92,29 +92,7 @@ const getEpicAtPosition = (index: number): Epic | null => {
 
 // 셀 클래스 결정
 const getCellClass = (index: number) => {
-  const classes = ['grid-cell-base'];
-  
-  if (props.gridIndex === 4) {
-    // 중앙 3x3 그리드
-    if (index === 5) {
-      classes.push('center-core-cell'); // 중앙 (1,1)
-    } else if (index === 1 || index === 3 || index === 7 || index === 9) {
-      classes.push('center-corner-cell'); // 모서리
-    } else {
-      classes.push('center-edge-cell'); // 변
-    }
-  } else {
-    // 주변 3x3 그리드
-    if (index === 5) {
-      classes.push('region-core-cell'); // 각 3x3의 중앙 (1,1)
-    } else if (index === 1 || index === 3 || index === 7 || index === 9) {
-      classes.push('region-corner-cell'); // 모서리
-    } else {
-      classes.push('region-edge-cell'); // 변
-    }
-  }
-  
-  return classes;
+  return ['grid-cell-base'];
 };
 
 // 셀 클릭 핸들러
@@ -177,38 +155,6 @@ const handleEpicClick = (epic: Epic | null) => {
 .grid-cell:hover {
   background-color: #f9fafb;
   transform: scale(1.02);
-}
-
-.center-core-cell {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border: 2px solid #f59e0b;
-  font-weight: bold;
-}
-
-.center-corner-cell {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 1px solid #fbbf24;
-}
-
-.center-edge-cell {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 1px solid #fbbf24;
-}
-
-.region-core-cell {
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-  border: 1px solid #0ea5e9;
-  font-weight: bold;
-}
-
-.region-corner-cell {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-}
-
-.region-edge-cell {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
 }
 
 .cell-content {

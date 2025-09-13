@@ -49,6 +49,11 @@ export interface HabitCommitCreate {
   effort: number; // 1-5 사이의 값
 }
 
+export interface HabitCommitUpdate {
+  description?: string | null;
+  effort?: number; // 1-5 사이의 값
+}
+
 class HabitService {
   async getHabits(epicId?: number, status?: string): Promise<Habit[]> {
     try {
@@ -132,6 +137,35 @@ class HabitService {
       return response.data;
     } catch (error) {
       console.error(`Error fetching habit commits for habit ${habitId}:`, error);
+      throw error;
+    }
+  }
+
+  async getHabitCommit(commitId: number): Promise<HabitCommit> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/habit/commit/${commitId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching habit commit ${commitId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateHabitCommit(commitId: number, commit: HabitCommitUpdate): Promise<HabitCommit> {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/api/habit/commit/${commitId}`, commit);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating habit commit ${commitId}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteHabitCommit(commitId: number): Promise<void> {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/habit/commit/${commitId}`);
+    } catch (error) {
+      console.error(`Error deleting habit commit ${commitId}:`, error);
       throw error;
     }
   }

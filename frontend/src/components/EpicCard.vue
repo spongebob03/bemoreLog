@@ -3,8 +3,9 @@
     class="epic-card"
     :class="{
       'empty': !epic,
-      'core-epic': epic && epic.depth === 0,
-      'sub-epic': epic && epic.depth > 0,
+      'depth-0': epic && epic.depth === 0,
+      'depth-1': epic && epic.depth === 1,
+      'depth-2': epic && epic.depth === 2,
       'clickable': epic,
       'is-compact': isCompact
     }"
@@ -75,14 +76,37 @@ const getMaxLength = (): number => {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.epic-card.core-epic {
-  border-color: #10b981;
+/* Depth 0: 붉은색 파스텔 톤 */
+.epic-card.depth-0 {
+  border-color: #f87171;
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+}
+
+.epic-card.depth-0:hover {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+/* Depth 1: 파랑색 파스텔 톤 */
+.epic-card.depth-1 {
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.epic-card.depth-1:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Depth 2: 초록색 파스텔 톤 */
+.epic-card.depth-2 {
+  border-color: #34d399;
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
 }
 
-.epic-card.sub-epic {
-  border-color: #f59e0b;
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+.epic-card.depth-2:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
 .epic-card.empty {
