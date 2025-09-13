@@ -4,7 +4,7 @@
       v-for="index in 9" 
       :key="index"
       class="grid-cell"
-      :class="getCellClass(index)"
+      :class="[getCellClass(index), { 'has-epic': getEpicAtPosition(index) }]"
       @click="handleCellClick(index)"
     >
       <div class="cell-content">
@@ -92,29 +92,7 @@ const getEpicAtPosition = (index: number): Epic | null => {
 
 // 셀 클래스 결정
 const getCellClass = (index: number) => {
-  const classes = ['grid-cell-base'];
-  
-  if (props.gridIndex === 4) {
-    // 중앙 3x3 그리드
-    if (index === 5) {
-      classes.push('center-core-cell'); // 중앙 (1,1)
-    } else if (index === 1 || index === 3 || index === 7 || index === 9) {
-      classes.push('center-corner-cell'); // 모서리
-    } else {
-      classes.push('center-edge-cell'); // 변
-    }
-  } else {
-    // 주변 3x3 그리드
-    if (index === 5) {
-      classes.push('region-core-cell'); // 각 3x3의 중앙 (1,1)
-    } else if (index === 1 || index === 3 || index === 7 || index === 9) {
-      classes.push('region-corner-cell'); // 모서리
-    } else {
-      classes.push('region-edge-cell'); // 변
-    }
-  }
-  
-  return classes;
+  return ['grid-cell-base'];
 };
 
 // 셀 클릭 핸들러
@@ -139,7 +117,7 @@ const handleEpicClick = (epic: Epic | null) => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 2px;
+  gap: 4px;
   background-color: #f3f4f6;
   padding: 8px;
   border-radius: 8px;
@@ -147,8 +125,8 @@ const handleEpicClick = (epic: Epic | null) => {
 }
 
 .center-grid {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 2px solid #f59e0b;
+  background: #ffffff;
+  border: 2px solid #059669;
 }
 
 .surrounding-grid {
@@ -174,41 +152,20 @@ const handleEpicClick = (epic: Epic | null) => {
   border: 1px solid #e5e7eb;
 }
 
+/* Epic이 있는 셀은 배경색과 테두리 제거 */
+.grid-cell.has-epic {
+  background-color: transparent !important;
+  border: none !important;
+}
+
 .grid-cell:hover {
   background-color: #f9fafb;
   transform: scale(1.02);
 }
 
-.center-core-cell {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border: 2px solid #f59e0b;
-  font-weight: bold;
-}
-
-.center-corner-cell {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 1px solid #fbbf24;
-}
-
-.center-edge-cell {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 1px solid #fbbf24;
-}
-
-.region-core-cell {
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-  border: 1px solid #0ea5e9;
-  font-weight: bold;
-}
-
-.region-corner-cell {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-}
-
-.region-edge-cell {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
+/* Epic이 있는 셀의 hover 효과도 제거 */
+.grid-cell.has-epic:hover {
+  background-color: transparent !important;
 }
 
 .cell-content {

@@ -3,8 +3,9 @@
     class="epic-card"
     :class="{
       'empty': !epic,
-      'core-epic': epic && epic.depth === 0,
-      'sub-epic': epic && epic.depth > 0,
+      'depth-0': epic && epic.depth === 0,
+      'depth-1': epic && epic.depth === 1,
+      'depth-2': epic && epic.depth === 2,
       'clickable': epic,
       'is-compact': isCompact
     }"
@@ -75,14 +76,46 @@ const getMaxLength = (): number => {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.epic-card.core-epic {
-  border-color: #10b981;
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+/* Depth 0: 진한 에메랄드 초록색 (더 강조된 색) */
+.epic-card.depth-0 {
+  border-color: #059669;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
 }
 
-.epic-card.sub-epic {
-  border-color: #f59e0b;
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+.epic-card.depth-0:hover {
+  border-color: #047857;
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.15);
+}
+
+.epic-card.depth-0 .epic-title {
+  color: white;
+}
+
+.epic-card.depth-0 .epic-description {
+  color: #d1fae5;
+}
+
+/* Depth 1: 밝은 초록색 */
+.epic-card.depth-1 {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%);
+}
+
+.epic-card.depth-1:hover {
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
+}
+
+/* Depth 2: 연두색 */
+.epic-card.depth-2 {
+  border-color: #d9f99d;
+  background: linear-gradient(135deg, #ecfccb 0%, #d9f99d 100%);
+}
+
+.epic-card.depth-2:hover {
+  border-color: #4d7c0f;
+  box-shadow: 0 4px 12px rgba(77, 124, 15, 0.15);
 }
 
 .epic-card.empty {
