@@ -76,37 +76,46 @@ const getMaxLength = (): number => {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-/* Depth 0: 붉은색 파스텔 톤 */
+/* Depth 0: 진한 에메랄드 초록색 (더 강조된 색) */
 .epic-card.depth-0 {
-  border-color: #f87171;
-  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+  border-color: #059669;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
 }
 
 .epic-card.depth-0:hover {
-  border-color: #ef4444;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+  border-color: #047857;
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.15);
 }
 
-/* Depth 1: 파랑색 파스텔 톤 */
+.epic-card.depth-0 .epic-title {
+  color: white;
+}
+
+.epic-card.depth-0 .epic-description {
+  color: #d1fae5;
+}
+
+/* Depth 1: 밝은 초록색 */
 .epic-card.depth-1 {
-  border-color: #60a5fa;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #10b981;
+  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%);
 }
 
 .epic-card.depth-1:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
 }
 
-/* Depth 2: 초록색 파스텔 톤 */
+/* Depth 2: 연두색 */
 .epic-card.depth-2 {
-  border-color: #34d399;
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #65a30d;
+  background: linear-gradient(135deg, #ecfccb 0%, #d9f99d 100%);
 }
 
 .epic-card.depth-2:hover {
-  border-color: #10b981;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  border-color: #4d7c0f;
+  box-shadow: 0 4px 12px rgba(77, 124, 15, 0.15);
 }
 
 .epic-card.empty {
