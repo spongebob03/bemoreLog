@@ -4,7 +4,7 @@
       v-for="index in 9" 
       :key="index"
       class="grid-cell"
-      :class="getCellClass(index)"
+      :class="[getCellClass(index), { 'has-epic': getEpicAtPosition(index) }]"
       @click="handleCellClick(index)"
     >
       <div class="cell-content">
@@ -117,7 +117,7 @@ const handleEpicClick = (epic: Epic | null) => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 2px;
+  gap: 4px;
   background-color: #f3f4f6;
   padding: 8px;
   border-radius: 8px;
@@ -125,8 +125,8 @@ const handleEpicClick = (epic: Epic | null) => {
 }
 
 .center-grid {
-  background: linear-gradient(135deg, #fefce8, #fef3c7);
-  border: 2px solid #f59e0b;
+  background: #ffffff;
+  border: 2px solid #059669;
 }
 
 .surrounding-grid {
@@ -152,9 +152,20 @@ const handleEpicClick = (epic: Epic | null) => {
   border: 1px solid #e5e7eb;
 }
 
+/* Epic이 있는 셀은 배경색과 테두리 제거 */
+.grid-cell.has-epic {
+  background-color: transparent !important;
+  border: none !important;
+}
+
 .grid-cell:hover {
   background-color: #f9fafb;
   transform: scale(1.02);
+}
+
+/* Epic이 있는 셀의 hover 효과도 제거 */
+.grid-cell.has-epic:hover {
+  background-color: transparent !important;
 }
 
 .cell-content {

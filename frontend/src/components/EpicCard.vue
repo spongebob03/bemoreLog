@@ -109,7 +109,7 @@ const getMaxLength = (): number => {
 
 /* Depth 2: 연두색 */
 .epic-card.depth-2 {
-  border-color: #65a30d;
+  border-color: #d9f99d;
   background: linear-gradient(135deg, #ecfccb 0%, #d9f99d 100%);
 }
 
